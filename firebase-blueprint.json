@@ -1,0 +1,191 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and role information",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "teacher", "student"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "enrolledCourses": { "type": "array", "items": { "type": "string" } },
+        "stats": {
+          "type": "object",
+          "properties": {
+            "hoursSpent": { "type": "number" },
+            "coursesCompleted": { "type": "number" },
+            "totalPoints": { "type": "number" }
+          }
+        }
+      },
+      "required": ["email", "role"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Educational course structure",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "courseCode": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "published"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "teacherId", "courseCode"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "Individual learning session content",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "objectives": { "type": "array", "items": { "type": "string" } },
+        "videoUrl": { "type": "string" },
+        "wordUrl": { "type": "string" },
+        "pptUrl": { "type": "string" },
+        "pdfUrl": { "type": "string" },
+        "activities": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "description": { "type": "string" },
+              "type": { "type": "string" },
+              "startDate": { "type": "string", "format": "date-time" },
+              "endDate": { "type": "string", "format": "date-time" }
+            }
+          } 
+        },
+        "evaluation": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "question": { "type": "string" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "correctAnswer": { "type": "number" }
+            }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "Student activity submission and teacher evaluation",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "activityId": { "type": "string" },
+        "answer": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "graded"] },
+        "grade": { "type": "number" },
+        "feedback": { "type": "string" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "gradedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentId", "sessionId", "activityId"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Student record managed by teacher",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "academicId": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "progress": { "type": "number" },
+        "lastActive": { "type": "string" }
+      },
+      "required": ["name", "email"]
+    },
+    "Recommendation": {
+      "title": "Recommendation",
+      "description": "Teacher's recommendations and instructions",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "teacherId": { "type": "string" }
+      },
+      "required": ["text"]
+    },
+    "ForumTopic": {
+      "title": "Forum Topic",
+      "description": "Discussion topic in the forum",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "authorId"]
+    },
+    "ForumReply": {
+      "title": "Forum Reply",
+      "description": "Reply to a forum topic",
+      "type": "object",
+      "properties": {
+        "topicId": { "type": "string" },
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["topicId", "content", "authorId"]
+    },
+    "StudentQuestion": {
+      "title": "Student Question",
+      "description": "Direct question from a student to teachers",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorRole": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "answered"] },
+        "replies": { "type": "array", "items": { "type": "object" } }
+      },
+      "required": ["title", "content", "authorId"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "Real-time message in the group chat room",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text", "senderId", "senderName"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profiles" },
+    "/courses/{courseId}": { "schema": "Course", "description": "Course content" },
+    "/sessions/{sessionId}": { "schema": "Session", "description": "Session details" },
+    "/students/{studentId}": { "schema": "Student", "description": "Student records" },
+    "/quizzes/{quizId}": { "schema": "Quiz", "description": "Quizzes" },
+    "/submissions/{submissionId}": { "schema": "Submission", "description": "Student submissions" },
+    "/recommendations/{recommendationId}": { "schema": "Recommendation", "description": "Teacher recommendations" },
+    "/forum_topics/{topicId}": { "schema": "ForumTopic", "description": "Forum topics" },
+    "/forum_replies/{replyId}": { "schema": "ForumReply", "description": "Forum replies" },
+    "/student_questions/{questionId}": { "schema": "StudentQuestion", "description": "Student questions and inquiries" },
+    "/chat_messages/{messageId}": { "schema": "ChatMessage", "description": "Group chat messages" }
+  }
+}

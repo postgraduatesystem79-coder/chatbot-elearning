@@ -1,0 +1,11 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+knowledge_data/
+uploads/
+# firebase-applet-config.json is intentionally NOT ignored (public client config)
