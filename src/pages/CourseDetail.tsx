@@ -1280,6 +1280,7 @@ export function CourseDetail() {
                             disabled={hasChecked}
                             onClick={() => {
                               setQuizAnswers({ ...quizAnswers, [currentQuestionIndex]: opt.id });
+                              setCheckedQuestions({ ...checkedQuestions, [currentQuestionIndex]: true });
                             }}
                             className={cn(
                               "w-full p-5 rounded-xl border text-start transition-all font-bold relative group flex items-center justify-between",
@@ -1299,16 +1300,7 @@ export function CourseDetail() {
                       })}
                     </div>
 
-                    {/* Confirm answer button */}
-                    {quizAnswers[currentQuestionIndex] && !checkedQuestions[currentQuestionIndex] && (
-                      <button
-                        onClick={() => setCheckedQuestions({ ...checkedQuestions, [currentQuestionIndex]: true })}
-                        className="w-full py-3 rounded-xl bg-secondary text-secondary-foreground font-bold hover:bg-secondary/80 transition-all shadow-md flex items-center justify-center gap-2"
-                      >
-                        <CheckCircle2 size={18} />
-                        <span>تأكيد الإجابة</span>
-                      </button>
-                    )}
+
 
                     {checkedQuestions[currentQuestionIndex] && (
                       <motion.div 
