@@ -27,7 +27,7 @@ import {
   Trash
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import { cn, normalizeEvaluation } from '../lib/utils';
 import { toast } from 'sonner';
 
 export function QuizManagement() {
@@ -124,6 +124,7 @@ export function QuizManagement() {
     try {
       const quizData = {
         ...newQuiz,
+        evaluation: normalizeEvaluation(newQuiz.evaluation),
         lessonNumber: sessions.filter(s => s.courseId === newQuiz.courseId).length + 1,
         status: 'published',
         createdAt: serverTimestamp(),

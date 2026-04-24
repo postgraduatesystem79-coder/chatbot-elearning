@@ -354,7 +354,7 @@ export function CourseDetail() {
         code: editingSession.code,
         objectives: newObjectives,
         activities: editingSession.activities,
-        evaluation: editingSession.evaluation,
+        evaluation: normalizeEvaluation(editingSession.evaluation),
         content: [
           { id: 'web', type: 'web', title: 'صفحة ويب', icon: 'Globe', color: 'text-blue-600', url: editingSession.webUrl },
           { id: 'code', type: 'code', title: 'كود مدمج', icon: 'FileCode', color: 'text-slate-600', url: editingSession.code },

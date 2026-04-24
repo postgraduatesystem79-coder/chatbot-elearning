@@ -276,20 +276,7 @@ export function CourseLessons() {
         generalObjective: editingSession.generalObjective,
         objectives: newObjectives,
         activities: editingSession.activities,
-        evaluation: editingSession.evaluation.map((q: any) => {
-          // Normalize true_false questions to standard format before saving
-          if (q.type === 'true_false' && q.correctAnswer !== undefined && (!q.options || q.options.length === 0)) {
-            return {
-              ...q,
-              options: [
-                { id: 'a', text: 'صواب' },
-                { id: 'b', text: 'خطأ' }
-              ],
-              correctId: q.correctAnswer === 'true' ? 'a' : 'b'
-            };
-          }
-          return q;
-        }),
+        evaluation: normalizeEvaluation(editingSession.evaluation),
         updatedAt: serverTimestamp(),
         content: [
           { id: 'web', type: 'web', title: 'صفحة ويب', icon: 'Globe', color: 'text-blue-600', url: editingSession.webUrl },

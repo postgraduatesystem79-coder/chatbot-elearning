@@ -79,6 +79,7 @@ export function normalizeEvaluation(evaluation: any[]) {
   if (!Array.isArray(evaluation)) return [];
   
   return evaluation.map((q: any) => {
+    // 1. Handle case where question is just a string
     if (typeof q === 'string') {
       return {
         id: Math.random().toString(36).substring(2, 9),
@@ -92,39 +93,54 @@ export function normalizeEvaluation(evaluation: any[]) {
       };
     }
     
-    // Handle true_false type from CourseLessons editor (uses correctAnswer instead of correctId)
-    if (q.type === 'true_false' && q.correctAnswer !== undefined && !q.options?.length) {
+    const type = q.type || (q.options?.length === 2 ? 'true_false' : 'mcq');
+    
+    // 2. Handle true_false normalization
+    if (type === 'true_false') {
+      const options = [
+        { id: 'a', text: 'صواب' },
+        { id: 'b', text: 'خطأ' }
+      ];
+      
+      let correctId = q.correctId;
+      // If correctAnswer is present, it takes precedence for T/F
+      if (q.correctAnswer !== undefined) {
+        correctId = q.correctAnswer === 'true' ? 'a' : 'b';
+      }
+      
       return {
         ...q,
         id: q.id || Math.random().toString(36).substring(2, 9),
         question: q.question || '',
-        options: [
-          { id: 'a', text: 'صواب' },
-          { id: 'b', text: 'خطأ' }
-        ],
-        correctId: q.correctAnswer === 'true' ? 'a' : 'b',
+        options,
+        correctId: correctId || 'a',
         type: 'true_false'
       };
     }
 
-    // Normalize options
+    // 3. Normalize MCQ / other types
     let rawOptions = Array.isArray(q.options) ? q.options : [];
     
-    // If it's a T/F question but options are empty/invalid, provide defaults
-    if (rawOptions.length === 0 && (q.type === 'true_false' || q.question?.includes('؟'))) {
-       rawOptions = [{ id: 'a', text: 'صواب' }, { id: 'b', text: 'خطأ' }];
+    // If it's an MCQ but has no options, provide defaults
+    if (rawOptions.length === 0) {
+       rawOptions = [
+         { id: 'a', text: 'الخيار 1' }, 
+         { id: 'b', text: 'الخيار 2' }, 
+         { id: 'c', text: 'الخيار 3' }, 
+         { id: 'd', text: 'الخيار 4' }
+       ];
     }
 
-    // Normalize option text: map common T/F variants to standard text
     const normalizedOptions = rawOptions.map((opt: any, idx: number) => {
       if (typeof opt === 'string') {
         const id = String.fromCharCode(97 + idx); // a, b, c, d
         return { id, text: opt };
       }
-      let text = opt?.text || `Option ${idx + 1}`;
-      // Normalize common true/false variants
-      if (text === 'صح' || text === 'صحيح' || text === 'True' || text === 'true') text = 'صواب';
-      if (text === 'خطا' || text === 'خاطئ' || text === 'False' || text === 'false') text = 'خطأ';
+      let text = opt?.text || '';
+      // Map common variants to standard labels
+      const lowerText = text.trim().toLowerCase();
+      if (['صح', 'صحيح', 'true', 'yes', 'نعم'].includes(lowerText)) text = 'صواب';
+      if (['خطأ', 'خطا', 'خاطئ', 'false', 'no', 'لا'].includes(lowerText)) text = 'خطأ';
       
       return {
         id: opt?.id || String.fromCharCode(97 + idx),
@@ -132,23 +148,13 @@ export function normalizeEvaluation(evaluation: any[]) {
       };
     });
 
-    // Handle correctAnswer -> correctId conversion for true_false with existing options
-    let correctId = q.correctId;
-    if (!correctId && q.correctAnswer !== undefined) {
-      if (q.correctAnswer === 'true') {
-        correctId = normalizedOptions.find((o: any) => o.text === 'صواب')?.id || 'a';
-      } else {
-        correctId = normalizedOptions.find((o: any) => o.text === 'خطأ')?.id || 'b';
-      }
-    }
-    
     return {
       ...q,
       id: q.id || Math.random().toString(36).substring(2, 9),
       question: q.question || '',
       options: normalizedOptions,
-      correctId: correctId || (normalizedOptions[0]?.id || 'a'),
-      type: q.type || (normalizedOptions.length === 2 ? 'true_false' : 'multiple_choice')
+      correctId: q.correctId || (normalizedOptions[0]?.id || 'a'),
+      type: type
     };
   });
 }
