@@ -276,6 +276,15 @@ export function CourseDetail() {
     return () => unsubscribe();
   }, [courseId, lessonId, isTeacher, profile?.stats?.completedLessons, profile?.stats?.evaluationPerformance]);
 
+  // Check if current lesson is completed
+  const statsKey = sessionData?.lessonNumber ? `session-${sessionData.lessonNumber}` : lessonId;
+  const isLessonCompleted = lessonId && (
+    profile?.stats?.completedLessons?.includes(statsKey) || 
+    profile?.stats?.completedLessons?.includes(lessonId) ||
+    profile?.stats?.evaluationPerformance?.[statsKey] !== undefined ||
+    profile?.stats?.evaluationPerformance?.[lessonId] !== undefined
+  );
+
   // Fetch session data from Firestore
   useEffect(() => {
     const sessionId = lessonId || 'session-1';
@@ -944,16 +953,16 @@ export function CourseDetail() {
                   <button onClick={() => setStep('objectives')} className="flex-1 py-3 rounded-xl border border-border font-bold hover:bg-muted transition-all text-foreground">السابق</button>
                   <button 
                     onClick={() => setStep('activities')} 
-                    disabled={(!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead)) && !isTeacher}
+                    disabled={(!isLessonCompleted && (!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead))) && !isTeacher}
                     className={cn(
                       "flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20",
-                      (!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead)) && !isTeacher && "grayscale"
+                      (!isLessonCompleted && (!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead))) && !isTeacher && "grayscale"
                     )}
                   >
                     انتقل للأنشطة
                   </button>
                 </div>
-                {(!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead)) && !isTeacher && (
+                {!isLessonCompleted && (!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead)) && !isTeacher && (
                   <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground font-bold animate-pulse">
                     <AlertCircle size={12} strokeWidth={2} />
                     <span>يرجى قراءة المحتوى ومشاهدة الفيديو التعليمي وتأكيد ذلك لتفعيل زر التالي</span>
