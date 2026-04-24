@@ -57,7 +57,7 @@ export function Header() {
                   {profile?.displayName || 'admin'}
                 </span>
                 <span className="text-white/60 text-[10px] mt-1 font-medium uppercase tracking-wider">
-                  {profile?.role === 'admin' ? 'مدير' : 'معلم'}
+                  {profile?.role === 'admin' ? 'مدير' : profile?.role === 'teacher' ? 'معلم' : 'متعلم'}
                 </span>
               </div>
 

@@ -35,7 +35,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/useAuth';
 import { toast } from 'sonner';
-import { cn, getYouTubeEmbedUrl } from '../lib/utils';
+import { cn, getYouTubeEmbedUrl, normalizeEvaluation } from '../lib/utils';
 
 interface Lesson {
   id: string;

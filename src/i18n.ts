@@ -142,7 +142,7 @@ const resources = {
       "profile": "الملف الشخصي",
       "admin": "مدير",
       "teacher": "معلم",
-      "student": "طالب",
+      "student": "متعلم",
       "search": "بحث...",
       "notifications": "الإشعارات",
       "dark_mode": "الوضع الليلي",

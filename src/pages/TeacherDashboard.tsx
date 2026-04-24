@@ -424,14 +424,7 @@ export function TeacherDashboard() {
         audioUrl: editingSession.audioUrl,
         objectives: newObjectives,
         activities: Array.isArray(editingSession.activities) ? editingSession.activities : [],
-        evaluation: (Array.isArray(editingSession.evaluation) ? editingSession.evaluation : []).map((q: any) => {
-          // Ensure each question has a correctId that exists in its options
-          const hasCorrectId = q.options.some((opt: any) => opt.id === q.correctId);
-          return {
-            ...q,
-            correctId: hasCorrectId ? q.correctId : (q.options[0]?.id || '')
-          };
-        }),
+        evaluation: normalizeEvaluation(editingSession.evaluation),
         updatedAt: serverTimestamp(),
         // Update content array if it exists
         content: [
