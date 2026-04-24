@@ -84,32 +84,71 @@ export function normalizeEvaluation(evaluation: any[]) {
         id: Math.random().toString(36).substring(2, 9),
         question: q,
         options: [
-          { id: 'a', text: 'Option A' },
-          { id: 'b', text: 'Option B' }
+          { id: 'a', text: 'صواب' },
+          { id: 'b', text: 'خطأ' }
         ],
-        correctId: 'a'
+        correctId: 'a',
+        type: 'true_false'
       };
     }
     
-    const normalizedOptions = (Array.isArray(q.options) ? q.options : []).map((opt: any, idx: number) => {
+    // Handle true_false type from CourseLessons editor (uses correctAnswer instead of correctId)
+    if (q.type === 'true_false' && q.correctAnswer !== undefined && !q.options?.length) {
+      return {
+        ...q,
+        id: q.id || Math.random().toString(36).substring(2, 9),
+        question: q.question || '',
+        options: [
+          { id: 'a', text: 'صواب' },
+          { id: 'b', text: 'خطأ' }
+        ],
+        correctId: q.correctAnswer === 'true' ? 'a' : 'b',
+        type: 'true_false'
+      };
+    }
+
+    // Normalize options
+    let rawOptions = Array.isArray(q.options) ? q.options : [];
+    
+    // If it's a T/F question but options are empty/invalid, provide defaults
+    if (rawOptions.length === 0 && (q.type === 'true_false' || q.question?.includes('؟'))) {
+       rawOptions = [{ id: 'a', text: 'صواب' }, { id: 'b', text: 'خطأ' }];
+    }
+
+    // Normalize option text: map common T/F variants to standard text
+    const normalizedOptions = rawOptions.map((opt: any, idx: number) => {
       if (typeof opt === 'string') {
-        return {
-          id: String.fromCharCode(97 + idx), // a, b, c, d
-          text: opt
-        };
+        const id = String.fromCharCode(97 + idx); // a, b, c, d
+        return { id, text: opt };
       }
+      let text = opt?.text || `Option ${idx + 1}`;
+      // Normalize common true/false variants
+      if (text === 'صح' || text === 'صحيح' || text === 'True' || text === 'true') text = 'صواب';
+      if (text === 'خطا' || text === 'خاطئ' || text === 'False' || text === 'false') text = 'خطأ';
+      
       return {
         id: opt?.id || String.fromCharCode(97 + idx),
-        text: opt?.text || ''
+        text
       };
     });
+
+    // Handle correctAnswer -> correctId conversion for true_false with existing options
+    let correctId = q.correctId;
+    if (!correctId && q.correctAnswer !== undefined) {
+      if (q.correctAnswer === 'true') {
+        correctId = normalizedOptions.find((o: any) => o.text === 'صواب')?.id || 'a';
+      } else {
+        correctId = normalizedOptions.find((o: any) => o.text === 'خطأ')?.id || 'b';
+      }
+    }
     
     return {
       ...q,
       id: q.id || Math.random().toString(36).substring(2, 9),
       question: q.question || '',
       options: normalizedOptions,
-      correctId: q.correctId || (normalizedOptions[0]?.id || 'a')
+      correctId: correctId || (normalizedOptions[0]?.id || 'a'),
+      type: q.type || (normalizedOptions.length === 2 ? 'true_false' : 'multiple_choice')
     };
   });
 }

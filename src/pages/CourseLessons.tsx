@@ -276,7 +276,20 @@ export function CourseLessons() {
         generalObjective: editingSession.generalObjective,
         objectives: newObjectives,
         activities: editingSession.activities,
-        evaluation: editingSession.evaluation,
+        evaluation: editingSession.evaluation.map((q: any) => {
+          // Normalize true_false questions to standard format before saving
+          if (q.type === 'true_false' && q.correctAnswer !== undefined && (!q.options || q.options.length === 0)) {
+            return {
+              ...q,
+              options: [
+                { id: 'a', text: 'صواب' },
+                { id: 'b', text: 'خطأ' }
+              ],
+              correctId: q.correctAnswer === 'true' ? 'a' : 'b'
+            };
+          }
+          return q;
+        }),
         updatedAt: serverTimestamp(),
         content: [
           { id: 'web', type: 'web', title: 'صفحة ويب', icon: 'Globe', color: 'text-blue-600', url: editingSession.webUrl },
@@ -479,8 +492,22 @@ export function CourseLessons() {
           </div>
         ) : (
           lessons.map((lesson, index) => {
-            const isCompleted = profile?.stats?.completedLessons?.includes(lesson.id) || profile?.stats?.evaluationPerformance?.[lesson.id] !== undefined;
-            const isPreviousCompleted = index === 0 || (lessons[index - 1] && (profile?.stats?.completedLessons?.includes(lessons[index - 1].id) || profile?.stats?.evaluationPerformance?.[lessons[index - 1].id] !== undefined));
+            // Check completion using both session-X key and lesson.id for compatibility
+            const statsKey = lesson.lessonNumber ? `session-${lesson.lessonNumber}` : lesson.id;
+            const isCompleted = 
+              profile?.stats?.completedLessons?.includes(statsKey) || 
+              profile?.stats?.completedLessons?.includes(lesson.id) ||
+              profile?.stats?.evaluationPerformance?.[statsKey] !== undefined ||
+              profile?.stats?.evaluationPerformance?.[lesson.id] !== undefined;
+            
+            const prevLesson = lessons[index - 1];
+            const prevStatsKey = prevLesson?.lessonNumber ? `session-${prevLesson.lessonNumber}` : prevLesson?.id;
+            const isPreviousCompleted = index === 0 || (prevLesson && (
+              profile?.stats?.completedLessons?.includes(prevStatsKey) || 
+              profile?.stats?.completedLessons?.includes(prevLesson.id) ||
+              profile?.stats?.evaluationPerformance?.[prevStatsKey] !== undefined ||
+              profile?.stats?.evaluationPerformance?.[prevLesson.id] !== undefined
+            ));
             const isLocked = !isTeacher && !isPreviousCompleted;
 
             return (

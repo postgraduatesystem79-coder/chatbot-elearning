@@ -253,7 +253,9 @@ export function CourseDetail() {
         const previousLesson = lessons[currentIndex - 1];
         const prevStatsKey = previousLesson.lessonNumber ? `session-${previousLesson.lessonNumber}` : previousLesson.id;
         const isPrevCompleted = profile?.stats?.completedLessons?.includes(prevStatsKey) || 
-                                profile?.stats?.evaluationPerformance?.[prevStatsKey] !== undefined;
+                                profile?.stats?.completedLessons?.includes(previousLesson.id) ||
+                                profile?.stats?.evaluationPerformance?.[prevStatsKey] !== undefined ||
+                                profile?.stats?.evaluationPerformance?.[previousLesson.id] !== undefined;
         
         if (!isPrevCompleted) {
           setIsLocked(true);
@@ -387,19 +389,29 @@ export function CourseDetail() {
       if (profile?.uid && lessonId) {
         const statsRef = doc(db, 'users', profile.uid);
         const currentCompleted = profile?.stats?.completedLessons || [];
-        const newCompletedCount = currentCompleted.includes(getStatsKey()) 
+        const statsKey = getStatsKey();
+        const newCompletedCount = (currentCompleted.includes(statsKey) || currentCompleted.includes(lessonId))
           ? currentCompleted.length 
-          : currentCompleted.length + 1;
+          : currentCompleted.length + (statsKey !== lessonId ? 2 : 1);
         
         const totalLessons = allLessons.length || 7;
-        const progressPercent = Math.round((newCompletedCount / totalLessons) * 100);
+        const progressPercent = Math.round(((currentCompleted.includes(statsKey) ? currentCompleted.length : currentCompleted.length + 1) / totalLessons) * 100);
 
-        await updateDoc(statsRef, {
-          [`stats.evaluationPerformance.${getStatsKey()}`]: scorePercent,
-          [`stats.completedLessons`]: arrayUnion(getStatsKey()),
+        // Save with both keys (session-X and document ID) for cross-compatibility
+        const updateData: any = {
+          [`stats.evaluationPerformance.${statsKey}`]: scorePercent,
+          [`stats.completedLessons`]: arrayUnion(statsKey),
           [`stats.coursesCompleted`]: increment(1),
           progress: progressPercent
-        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}/stats/evaluation`));
+        };
+        // Also save using lessonId if it differs from statsKey
+        if (statsKey !== lessonId) {
+          updateData[`stats.evaluationPerformance.${lessonId}`] = scorePercent;
+          updateData[`stats.completedLessons`] = arrayUnion(statsKey, lessonId);
+        }
+
+        await updateDoc(statsRef, updateData)
+          .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}/stats/evaluation`));
       }
     } else {
       setHasFailed(true);
@@ -407,9 +419,16 @@ export function CourseDetail() {
       // Save failed attempt with score percentage
       if (profile?.uid && lessonId) {
         const statsRef = doc(db, 'users', profile.uid);
-        await updateDoc(statsRef, {
-          [`stats.evaluationPerformance.${getStatsKey()}`]: scorePercent // Save percentage even if failed
-        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}/stats/evaluation`));
+        const statsKey = getStatsKey();
+        const updateData: any = {
+          [`stats.evaluationPerformance.${statsKey}`]: scorePercent
+        };
+        // Also save using lessonId if it differs from statsKey
+        if (statsKey !== lessonId) {
+          updateData[`stats.evaluationPerformance.${lessonId}`] = scorePercent;
+        }
+        await updateDoc(statsRef, updateData)
+          .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}/stats/evaluation`));
       }
     }
     setStep('result');
@@ -1230,7 +1249,11 @@ export function CourseDetail() {
                     </div>
                     
                     <p className="text-xl font-bold text-foreground tracking-tight leading-relaxed">{sessionData.evaluation[currentQuestionIndex].question}</p>
-                    <div className="grid gap-3">
+                    
+                    <div className={cn(
+                      "grid gap-3",
+                      sessionData.evaluation[currentQuestionIndex].options.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
+                    )}>
                       {sessionData.evaluation[currentQuestionIndex].options.map((opt: any, oIdx: number) => {
                         const isSelected = quizAnswers[currentQuestionIndex] === opt.id;
                         const isCorrectOption = opt.id === sessionData.evaluation[currentQuestionIndex].correctId;
@@ -1242,26 +1265,35 @@ export function CourseDetail() {
                             disabled={hasChecked}
                             onClick={() => {
                               setQuizAnswers({ ...quizAnswers, [currentQuestionIndex]: opt.id });
-                              setCheckedQuestions({ ...checkedQuestions, [currentQuestionIndex]: true });
                             }}
                             className={cn(
-                              "w-full p-5 rounded-xl border text-start transition-all font-bold relative group",
+                              "w-full p-5 rounded-xl border text-start transition-all font-bold relative group flex items-center justify-between",
                               !hasChecked && isSelected && "bg-primary/5 border-primary shadow-inner",
                               hasChecked && isCorrectOption && "bg-green-500/5 border-green-500 text-green-600 shadow-inner",
                               hasChecked && isSelected && !isCorrectOption && "bg-destructive/5 border-destructive text-destructive shadow-inner",
-                              !hasChecked && "hover:bg-muted hover:border-primary/30"
+                              !hasChecked && "hover:bg-muted hover:border-primary/30",
+                              sessionData.evaluation[currentQuestionIndex].options.length === 2 && "justify-center text-center"
                             )}
                           >
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm">{opt.text}</span>
-                              {hasChecked && isCorrectOption && <CheckCircle2 size={20} className="text-green-600" strokeWidth={1.5} />}
-                              {hasChecked && isSelected && !isCorrectOption && <X size={20} className="text-destructive" strokeWidth={1.5} />}
-                              {!hasChecked && isSelected && <div className="w-4 h-4 rounded-full bg-primary shadow-lg shadow-primary/20" />}
-                            </div>
+                            <span className="text-sm">{opt.text}</span>
+                            {hasChecked && isCorrectOption && <CheckCircle2 size={20} className="text-green-600 absolute end-4 top-1/2 -translate-y-1/2" strokeWidth={1.5} />}
+                            {hasChecked && isSelected && !isCorrectOption && <X size={20} className="text-destructive absolute end-4 top-1/2 -translate-y-1/2" strokeWidth={1.5} />}
+                            {!hasChecked && isSelected && <div className="w-2 h-2 rounded-full bg-primary absolute end-4 top-1/2 -translate-y-1/2 shadow-lg shadow-primary/20" />}
                           </button>
                         );
                       })}
                     </div>
+
+                    {/* Confirm answer button */}
+                    {quizAnswers[currentQuestionIndex] && !checkedQuestions[currentQuestionIndex] && (
+                      <button
+                        onClick={() => setCheckedQuestions({ ...checkedQuestions, [currentQuestionIndex]: true })}
+                        className="w-full py-3 rounded-xl bg-secondary text-secondary-foreground font-bold hover:bg-secondary/80 transition-all shadow-md flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle2 size={18} />
+                        <span>تأكيد الإجابة</span>
+                      </button>
+                    )}
 
                     {checkedQuestions[currentQuestionIndex] && (
                       <motion.div 
@@ -1308,7 +1340,7 @@ export function CourseDetail() {
                   currentQuestionIndex < sessionData.evaluation.length - 1 ? (
                     <button 
                       onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
-                      disabled={!quizAnswers[currentQuestionIndex]}
+                      disabled={!checkedQuestions[currentQuestionIndex]}
                       className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all disabled:opacity-50"
                     >
                       السؤال التالي
@@ -1316,7 +1348,7 @@ export function CourseDetail() {
                   ) : (
                     <button 
                       onClick={handleEvaluation}
-                      disabled={!quizAnswers[currentQuestionIndex]}
+                      disabled={!checkedQuestions[currentQuestionIndex]}
                       className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all disabled:opacity-50"
                     >
                       إرسال الإجابة
@@ -1706,26 +1738,49 @@ export function CourseDetail() {
                   <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                     <div className="flex items-center justify-between">
                       <h4 className="font-bold text-sm text-muted-foreground uppercase">الأسئلة والتقييم</h4>
-                      <button 
-                        type="button"
-                        onClick={() => setEditingSession({
-                          ...editingSession,
-                          evaluation: [...editingSession.evaluation, {
-                            id: Date.now(),
-                            question: '',
-                            options: [
-                              { id: 'a', text: '' },
-                              { id: 'b', text: '' },
-                              { id: 'c', text: '' },
-                            ],
-                            correctId: 'b'
-                          }]
-                        })}
-                        className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
-                      >
-                        <Plus size={14} />
-                        إضافة سؤال جديد
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button 
+                          type="button"
+                          onClick={() => setEditingSession({
+                            ...editingSession,
+                            evaluation: [...editingSession.evaluation, {
+                              id: Date.now(),
+                              question: '',
+                              options: [
+                                { id: 'a', text: '' },
+                                { id: 'b', text: '' },
+                                { id: 'c', text: '' },
+                                { id: 'd', text: '' },
+                              ],
+                              correctId: 'a'
+                            }]
+                          })}
+                          className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
+                        >
+                          <Plus size={14} />
+                          سؤال اختيارات
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setEditingSession({
+                            ...editingSession,
+                            evaluation: [...editingSession.evaluation, {
+                              id: Date.now(),
+                              question: '',
+                              options: [
+                                { id: 'a', text: 'صواب' },
+                                { id: 'b', text: 'خطأ' },
+                              ],
+                              correctId: 'a',
+                              type: 'true_false'
+                            }]
+                          })}
+                          className="text-xs font-bold text-secondary flex items-center gap-1 hover:underline"
+                        >
+                          <Plus size={14} />
+                          سؤال صواب/خطأ
+                        </button>
+                      </div>
                     </div>
                     
                     <div className="space-y-8">
