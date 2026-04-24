@@ -991,7 +991,7 @@ export function CourseLessons() {
                             {qType === 'mcq' && (
                               <div className="space-y-2">
                                 {(q.options || []).map((opt: any, oIdx: number) => (
-                                  <div key={opt.id} className="flex items-center gap-2">
+                                  <div key={opt.id} className="flex items-center gap-2 group/opt">
                                     <input
                                       type="radio"
                                       name={`correct-${q.id}`}
@@ -1017,14 +1017,35 @@ export function CourseLessons() {
                                         q.correctId === opt.id ? 'border-green-500/60 bg-green-500/5' : 'border-transparent'
                                       )}
                                     />
+                                    {q.options.length > 2 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updated = [...editingSession.evaluation];
+                                          updated[qIdx].options = updated[qIdx].options.filter((_: any, i: number) => i !== oIdx);
+                                          // If we deleted the correct one, reset correctId
+                                          if (q.correctId === opt.id && updated[qIdx].options.length > 0) {
+                                            updated[qIdx].correctId = updated[qIdx].options[0].id;
+                                          }
+                                          setEditingSession({ ...editingSession, evaluation: updated });
+                                        }}
+                                        className="p-1 text-destructive opacity-0 group-hover/opt:opacity-100 transition-opacity hover:bg-destructive/10 rounded"
+                                        title="حذف الاختيار"
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    )}
                                   </div>
                                 ))}
                                 <button
                                   type="button"
                                   onClick={() => {
                                     const updated = [...editingSession.evaluation];
-                                    const nextId = String.fromCharCode(97 + (updated[qIdx].options?.length || 0));
-                                    updated[qIdx].options = [...(updated[qIdx].options || []), { id: nextId, text: '' }];
+                                    const options = updated[qIdx].options || [];
+                                    const lastOpt = options[options.length - 1];
+                                    const nextCharCode = lastOpt ? lastOpt.id.charCodeAt(0) + 1 : 97;
+                                    const nextId = String.fromCharCode(nextCharCode);
+                                    updated[qIdx].options = [...options, { id: nextId, text: '' }];
                                     setEditingSession({ ...editingSession, evaluation: updated });
                                   }}
                                   className="text-xs text-primary font-bold hover:underline mt-1"

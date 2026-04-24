@@ -90,8 +90,26 @@ export function QuizManagement() {
   const handleAddOption = (qIndex: number) => {
     const updated = [...newQuiz.evaluation];
     const question = updated[qIndex];
-    const nextId = String.fromCharCode(97 + question.options.length); // a, b, c, d...
+    const lastOpt = question.options[question.options.length - 1];
+    const nextCharCode = lastOpt ? lastOpt.id.charCodeAt(0) + 1 : 97;
+    const nextId = String.fromCharCode(nextCharCode);
     question.options.push({ id: nextId, text: '' });
+    setNewQuiz({ ...newQuiz, evaluation: updated });
+  };
+
+  const handleRemoveOption = (qIndex: number, optIndex: number) => {
+    const updated = [...newQuiz.evaluation];
+    const question = updated[qIndex];
+    if (question.options.length <= 2) return;
+    
+    const removedOptionId = question.options[optIndex].id;
+    question.options.splice(optIndex, 1);
+    
+    // If the removed option was the correct one, set the first option as correct
+    if (question.correctId === removedOptionId) {
+      question.correctId = question.options[0].id;
+    }
+    
     setNewQuiz({ ...newQuiz, evaluation: updated });
   };
 
@@ -358,7 +376,7 @@ export function QuizManagement() {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {q.options.map((opt, optIndex) => (
-                          <div key={optIndex} className="flex items-center gap-2">
+                          <div key={optIndex} className="flex items-center gap-2 group/opt">
                             <input
                               type="radio"
                               name={`correct-${qIndex}`}
@@ -382,6 +400,16 @@ export function QuizManagement() {
                               className="flex-1 bg-card border rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 ring-primary/20 transition-all"
                               placeholder={`الخيار ${opt.id.toUpperCase()}`}
                             />
+                            {q.options.length > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveOption(qIndex, optIndex)}
+                                className="p-1 text-destructive opacity-0 group-hover/opt:opacity-100 transition-opacity hover:bg-destructive/10 rounded"
+                                title="حذف الاختيار"
+                              >
+                                <X size={16} />
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>

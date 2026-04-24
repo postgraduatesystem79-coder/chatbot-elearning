@@ -83,10 +83,111 @@ export function CourseList() {
       ? query(coursesRef)
       : query(coursesRef, where('status', '==', 'published'));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    let hasRestoredCourse = false;
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       setCourses(data);
       setLoading(false);
+
+      if (!isTeacher || !profile?.uid || hasRestoredCourse) return;
+
+      let currentMainCourse = data.find((c: any) => 
+        c.title?.includes('ريادة') || c.title?.includes('الأعمال الرقمية')
+      );
+
+      // 1. If not found, check if we need to rename an old course
+      if (!currentMainCourse) {
+        for (const course of data) {
+          const title = (course as any).title || '';
+          if (title.includes('مكملات الملابس') || title.includes('مكملات')) {
+            try {
+              await updateDoc(doc(db, 'courses', course.id), {
+                title: 'ريادة الأعمال الرقمية',
+                description: 'مقرر ريادة الأعمال الرقمية - تنمية مهارات ريادة الأعمال الرقمية والاتجاه نحو العمل الحر لطلاب الجامعة',
+                category: 'ريادة أعمال',
+              });
+              toast.success('تم تحديث اسم المقرر إلى "ريادة الأعمال الرقمية" بنجاح');
+              currentMainCourse = { ...course, title: 'ريادة الأعمال الرقمية' };
+              break;
+            } catch (err) {
+              console.error('Migration error:', err);
+            }
+          }
+        }
+      }
+
+      // 2. If STILL not found, create it
+      if (!currentMainCourse) {
+        try {
+          const newCourseRef = await addDoc(collection(db, 'courses'), {
+            title: 'ريادة الأعمال الرقمية',
+            description: 'مقرر ريادة الأعمال الرقمية - تنمية مهارات ريادة الأعمال الرقمية والاتجاه نحو العمل الحر لطلاب الجامعة',
+            category: 'ريادة أعمال',
+            teacherName: profile?.name || profile?.displayName || 'Dr Heba fadl',
+            teacherId: profile?.uid,
+            rating: 5.0,
+            students: 0,
+            status: 'published',
+            duration: '45 دقيقة',
+            courseCode: 'DE2024',
+            imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=800',
+            createdAt: serverTimestamp(),
+          });
+          currentMainCourse = { id: newCourseRef.id, title: 'ريادة الأعمال الرقمية' };
+          toast.success('تم استعادة مقرر "ريادة الأعمال الرقمية" بنجاح');
+        } catch (err) {
+          console.error('Course creation error:', err);
+        }
+      }
+
+      // 3. Ensure lessons and students are linked to the main course
+      if (currentMainCourse) {
+        hasRestoredCourse = true;
+        try {
+          const { getDocs, collection: coll, query: q2, where: wh } = await import('firebase/firestore');
+          
+          // Link Orphaned Sessions
+          const sessionsSnapshot = await getDocs(coll(db, 'sessions'));
+          let linkedSessions = 0;
+          for (const sessionDoc of sessionsSnapshot.docs) {
+            const sess = sessionDoc.data();
+            if (!sess.courseId || !data.some(c => c.id === sess.courseId)) {
+              if (sess.courseId !== currentMainCourse.id) {
+                await updateDoc(doc(db, 'sessions', sessionDoc.id), { courseId: currentMainCourse.id });
+                linkedSessions++;
+              }
+            }
+          }
+
+          // Link All Students
+          const studentsSnapshot = await getDocs(query(coll(db, 'users'), wh('role', '==', 'student')));
+          let enrolledCount = 0;
+          let studentsChanged = false;
+          for (const userDoc of studentsSnapshot.docs) {
+            const userData = userDoc.data();
+            const enrolled = userData.enrolledCourses || [];
+            if (!enrolled.includes(currentMainCourse.id)) {
+              const validEnrollments = enrolled.filter((id: string) => data.some(c => c.id === id));
+              await updateDoc(doc(db, 'users', userDoc.id), {
+                enrolledCourses: [...validEnrollments, currentMainCourse.id]
+              });
+              studentsChanged = true;
+            }
+            enrolledCount++;
+          }
+
+          if (studentsChanged || (currentMainCourse as any).students !== enrolledCount) {
+            await updateDoc(doc(db, 'courses', currentMainCourse.id), { students: enrolledCount });
+          }
+
+          if (linkedSessions > 0 || studentsChanged) {
+            toast.success(`تم استرجاع ${linkedSessions} درس و ${enrolledCount} طالب للمقرر.`);
+          }
+        } catch (err) {
+          console.error('Final restoration error:', err);
+        }
+      }
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'courses');
       setLoading(false);
@@ -184,7 +285,7 @@ export function CourseList() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">اسم المقرر</h2>
+          <h2 className="text-3xl font-bold tracking-tight">ريادة الأعمال الرقمية</h2>
           <p className="text-muted-foreground mt-1">استكشف وادر مقرراتك التعليمية.</p>
         </div>
         {isTeacher && (

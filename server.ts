@@ -28,10 +28,14 @@ class MemoryVectorStore {
   }
   async similaritySearch(query: string, k: number) {
     if (this.docs.length === 0) return [];
-    const keywords = query.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+    const keywords = query.toLowerCase().split(/[^\w\u0621-\u064A]+/).filter((w) => w.length > 2);
     const scoredDocs = this.docs.map((doc) => {
       const content = doc.pageContent.toLowerCase();
       let score = keywords.reduce((s, kw) => s + (content.includes(kw) ? 1 : 0), 0);
+      // Give bonus for matching more keywords
+      if (score > 0) {
+        score += (score / keywords.length) * 0.5;
+      }
       return { doc, score };
     });
     const results = scoredDocs
@@ -190,7 +194,7 @@ async function startServer() {
     try {
       const apiKey = getApiKey();
       const genAI_old = new GoogleGenerativeAI(apiKey);
-      const testModel = genAI_old.getGenerativeModel({ model: "gemini-2.0-flash-lite" }, { apiVersion: "v1beta" });
+      const testModel = genAI_old.getGenerativeModel({ model: "gemini-2.0-flash" }, { apiVersion: "v1beta" });
       const testResult = await testModel.generateContent("Say hello in Arabic");
       res.json({ success: true, response: testResult.response.text() });
     } catch (error: any) {
@@ -303,13 +307,11 @@ ${context || "لا يوجد سياق متاح."}
 
 سؤال الطالب: ${question}`;
 
-      // Try full models first, then fall back to lite and Gemma
+      // Try full models first, then fall back to lite
       const MODELS = [
-        "gemini-2.5-flash-lite",
-        "gemini-2.0-flash-lite",
-        "gemini-2.5-flash",
-        "gemma-3-12b-it",
-        "gemma-3-27b-it"
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-8b"
       ];
       let kbResult: any = null;
       
@@ -389,11 +391,9 @@ ${kbContext ? `\nلديك المحتوى التعليمي التالي من قا
 
       // Try lite models first (separate quota pools), then standard models
       const MODELS = [
-        "gemini-2.5-flash-lite",
-        "gemini-2.0-flash-lite",
-        "gemini-2.5-flash",
-        "gemma-3-12b-it",
-        "gemma-3-27b-it"
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-8b"
       ];
       let lastError: any = null;
 
@@ -448,6 +448,139 @@ ${kbContext ? `\nلديك المحتوى التعليمي التالي من قا
     }
   });
 
+
+  // ===================== Course Restoration: إعادة إنشاء مقرر ريادة الأعمال الرقمية =====================
+  app.post("/api/restore-course", async (_req, res) => {
+    try {
+      // Use Firebase client SDK (already initialized) via Admin SDK if available
+      let courseId: string | null = null;
+      
+      if (admin.apps.length > 0) {
+        const firestore = admin.firestore();
+        const coursesRef = firestore.collection("courses");
+        
+        // Check if the course already exists
+        const existing = await coursesRef.where("title", "==", "ريادة الأعمال الرقمية").get();
+        if (!existing.empty) {
+          courseId = existing.docs[0].id;
+          res.json({ success: true, courseId, message: "المقرر موجود بالفعل", existed: true });
+          return;
+        }
+        
+        // Create the course
+        const courseData = {
+          title: "ريادة الأعمال الرقمية",
+          description: "مقرر ريادة الأعمال الرقمية - تنمية مهارات ريادة الأعمال الرقمية والاتجاه نحو العمل الحر لطلاب الجامعة",
+          category: "ريادة أعمال",
+          teacherName: "Dr Heba fadl",
+          teacherId: "",  // Will be linked by the teacher
+          rating: 5.0,
+          students: 0,
+          status: "published",
+          duration: "45 دقيقة",
+          courseCode: "DE2024",
+          imageUrl: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=800",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+        
+        const newCourseRef = await coursesRef.add(courseData);
+        courseId = newCourseRef.id;
+        console.log(`[Restore] ✅ Created course: ${courseId}`);
+        
+        // Find orphaned sessions (sessions without courseId or with non-existent courseId)
+        const sessionsRef = firestore.collection("sessions");
+        const allSessions = await sessionsRef.get();
+        let linkedCount = 0;
+        
+        for (const sessionDoc of allSessions.docs) {
+          const sessionData = sessionDoc.data();
+          const sessionCourseId = sessionData.courseId;
+          
+          // Check if this session's courseId points to a non-existent course
+          if (sessionCourseId) {
+            const courseDoc = await coursesRef.doc(sessionCourseId).get();
+            if (!courseDoc.exists) {
+              // Orphaned session - link it to the new course
+              await sessionDoc.ref.update({ courseId: courseId });
+              linkedCount++;
+              console.log(`[Restore] Linked orphaned session ${sessionDoc.id} to course ${courseId}`);
+            }
+          } else {
+            // No courseId at all - link it
+            await sessionDoc.ref.update({ courseId: courseId });
+            linkedCount++;
+            console.log(`[Restore] Linked session ${sessionDoc.id} (no courseId) to course ${courseId}`);
+          }
+        }
+        
+        // Update student count based on enrolled users
+        const usersRef = firestore.collection("users");
+        const allUsers = await usersRef.where("role", "==", "student").get();
+        let studentCount = 0;
+        
+        for (const userDoc of allUsers.docs) {
+          const userData = userDoc.data();
+          const enrolled = userData.enrolledCourses || [];
+          // If student was enrolled in the old (deleted) course, enroll them in the new one
+          if (enrolled.length > 0) {
+            // Check if any enrolled course doesn't exist anymore
+            for (const enrolledId of enrolled) {
+              const courseDoc = await coursesRef.doc(enrolledId).get();
+              if (!courseDoc.exists) {
+                // Replace old course ID with new one
+                const newEnrolled = enrolled.map((id: string) => id === enrolledId ? courseId : id);
+                await userDoc.ref.update({ enrolledCourses: newEnrolled });
+                studentCount++;
+              }
+            }
+          }
+        }
+        
+        // Update student count on course
+        if (studentCount > 0) {
+          await newCourseRef.update({ students: studentCount });
+        }
+        
+        res.json({ 
+          success: true, 
+          courseId, 
+          message: `تم إنشاء المقرر وربط ${linkedCount} درس و${studentCount} طالب`, 
+          linkedSessions: linkedCount,
+          linkedStudents: studentCount
+        });
+      } else {
+        res.status(500).json({ success: false, error: "Firebase Admin not initialized" });
+      }
+    } catch (e: any) {
+      console.error("[Restore] Error:", e.message);
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // Manual migration endpoint (rename existing courses)
+  app.post("/api/migrate-course", async (_req, res) => {
+    try {
+      if (admin.apps.length === 0) {
+        return res.json({ success: false, error: "Firebase Admin not initialized" });
+      }
+      const firestore = admin.firestore();
+      const coursesRef = firestore.collection("courses");
+      const snapshot = await coursesRef.where("title", "==", "مكملات الملابس").get();
+      let migratedCount = 0;
+      for (const docSnap of snapshot.docs) {
+        await docSnap.ref.update({
+          title: "ريادة الأعمال الرقمية",
+          description: "مقرر ريادة الأعمال الرقمية - تنمية مهارات ريادة الأعمال الرقمية والاتجاه نحو العمل الحر لطلاب الجامعة",
+          category: "ريادة أعمال",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        migratedCount++;
+      }
+      res.json({ success: true, migrated: migratedCount });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
 
   // ===================== Vite Middleware =====================
   if (process.env.NODE_ENV !== "production") {

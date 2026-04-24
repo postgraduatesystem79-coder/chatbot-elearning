@@ -40,7 +40,7 @@ export function Login() {
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (!userDoc.exists()) {
-        const isAdminEmail = ['postgraduatesystem79@gmail.com', 'gradateminia@gmail.com', 'drosamaayed@gmail.com', 'admin@adptive.edu.eg', 'admin@system.com'].includes(user.email || '');
+        const isAdminEmail = ['postgraduatesystem79@gmail.com', 'gradateminia@gmail.com', 'drosamaayed@gmail.com', 'admin@adptive.edu.eg', 'admin@system.com', 'admin@chatbot.com'].includes(user.email || '');
         const path = `users/${user.uid}`;
         try {
           await setDoc(doc(db, 'users', user.uid), {
