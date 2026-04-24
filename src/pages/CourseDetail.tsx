@@ -748,7 +748,7 @@ export function CourseDetail() {
                   const isLocked = !isTeacher && isVideoItem && hasWeb && !isWebRead;
                   
                   let isDisabled = false;
-                  if (!isTeacher && !isAdmin) {
+                  if (!isTeacher && !isAdmin && !isLessonCompleted) {
                     if (isWebItem) {
                       isDisabled = false;
                     } else if (isVideoItem) {
