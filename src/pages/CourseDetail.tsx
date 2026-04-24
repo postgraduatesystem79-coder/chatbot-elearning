@@ -250,6 +250,11 @@ export function CourseDetail() {
       
       const currentIndex = lessons.findIndex(l => l.id === lessonId);
       if (currentIndex > 0) {
+        const currentLesson = lessons[currentIndex];
+        const statsKey = currentLesson.lessonNumber ? `session-${currentLesson.lessonNumber}` : currentLesson.id;
+        const isCurrentCompleted = profile?.stats?.completedLessons?.includes(statsKey) || 
+                                   profile?.stats?.completedLessons?.includes(currentLesson.id);
+
         const previousLesson = lessons[currentIndex - 1];
         const prevStatsKey = previousLesson.lessonNumber ? `session-${previousLesson.lessonNumber}` : previousLesson.id;
         const isPrevCompleted = profile?.stats?.completedLessons?.includes(prevStatsKey) || 
@@ -257,7 +262,8 @@ export function CourseDetail() {
                                 profile?.stats?.evaluationPerformance?.[prevStatsKey] !== undefined ||
                                 profile?.stats?.evaluationPerformance?.[previousLesson.id] !== undefined;
         
-        if (!isPrevCompleted) {
+        // Locked only if current is NOT completed AND previous is NOT completed
+        if (!isCurrentCompleted && !isPrevCompleted) {
           setIsLocked(true);
           toast.error('يجب إكمال الدرس السابق أولاً');
           navigate(`/courses/${courseId}/lessons`);

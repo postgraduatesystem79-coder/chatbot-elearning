@@ -508,7 +508,8 @@ export function CourseLessons() {
               profile?.stats?.evaluationPerformance?.[prevStatsKey] !== undefined ||
               profile?.stats?.evaluationPerformance?.[prevLesson.id] !== undefined
             ));
-            const isLocked = !isTeacher && !isPreviousCompleted;
+            // A lesson is locked ONLY if it's not completed AND the previous one is not completed
+            const isLocked = !isTeacher && !isPreviousCompleted && !isCompleted;
 
             return (
               <motion.div
