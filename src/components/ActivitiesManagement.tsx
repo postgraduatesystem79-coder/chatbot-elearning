@@ -280,7 +280,24 @@ export function ActivitiesManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {session.activities?.map((activity: any) => {
-                const activitySubmissions = submissions.filter(s => s.activityId === activity.id);
+                const rawSubmissions = submissions.filter(s => s.activityId === activity.id);
+                const uniqueSubmissions: any[] = [];
+                const seenStudents = new Set();
+                
+                const sortedSubmissions = [...rawSubmissions].sort((a, b) => {
+                  const timeA = a.submittedAt?.seconds || (typeof a.submittedAt?.toMillis === 'function' ? a.submittedAt.toMillis() : 0);
+                  const timeB = b.submittedAt?.seconds || (typeof b.submittedAt?.toMillis === 'function' ? b.submittedAt.toMillis() : 0);
+                  return timeB - timeA;
+                });
+
+                for (const sub of sortedSubmissions) {
+                  if (sub.studentId && !seenStudents.has(sub.studentId)) {
+                    seenStudents.add(sub.studentId);
+                    uniqueSubmissions.push(sub);
+                  }
+                }
+                
+                const activitySubmissions = uniqueSubmissions;
                 const userSubmission = !isTeacher ? activitySubmissions[0] : null;
                 
                 return (
