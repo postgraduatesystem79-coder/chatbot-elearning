@@ -2,6 +2,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+ENV NODE_ENV=production
+ENV PORT=10000
+
 # Copy package.json only (no package-lock.json)
 COPY package.json ./
 COPY .npmrc ./
@@ -15,8 +18,8 @@ COPY . .
 # Build the frontend with Vite
 RUN npm run build
 
-# Expose port
-EXPOSE 3000
+# Expose Render's default web service port
+EXPOSE 10000
 
 # Start Express server
 CMD ["node", "--import", "tsx/esm", "server.ts"]
