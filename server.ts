@@ -128,14 +128,21 @@ loadMetaFromDisk();
 loadChunksFromDisk();
 
 // ===================== Server =====================
-async function startServer() {
-  const app = express();
-  const PORT = parseInt(process.env.PORT || "3000", 10);
+export const app = express();
+const PORT = parseInt(process.env.PORT || "3000", 10);
 
-  app.use(cors());
-  app.use(express.json());
+app.use(cors());
+app.use(express.json());
 
-  const upload = multer({ storage: multer.memoryStorage() });
+// Normalize /api path in serverless environments if stripped
+app.use((req, _res, next) => {
+  if (process.env.VERCEL && !req.url.startsWith("/api")) {
+    req.url = "/api" + req.url;
+  }
+  next();
+});
+
+const upload = multer({ storage: multer.memoryStorage() });
 
   // Firebase init (client SDK) - reads from env var in production, file in dev
   let firebaseConfig: any;
@@ -589,24 +596,29 @@ ${kbContext ? `\nلديك المحتوى التعليمي التالي من قا
     }
   });
 
-  // ===================== Vite Middleware =====================
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+  // ===================== Vite Middleware / Static =====================
+  async function startServer() {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (_req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
+  if (!process.env.VERCEL) {
+    startServer();
+  }
 
-startServer();
+  export default app;

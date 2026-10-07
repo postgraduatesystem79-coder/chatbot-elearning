@@ -92,7 +92,7 @@ export function CourseList() {
 
       if (!isTeacher || !profile?.uid || hasRestoredCourse) return;
 
-      let currentMainCourse = data.find((c: any) => 
+      let currentMainCourse: any = data.find((c: any) => 
         c.title?.includes('ريادة') || c.title?.includes('الأعمال الرقمية')
       );
 
