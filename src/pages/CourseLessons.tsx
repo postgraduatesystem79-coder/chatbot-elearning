@@ -428,7 +428,26 @@ export function CourseLessons() {
       </div>
 
       <CourseJourneyPanel courseId={id!} />
+
+      {journey?.config.enabled && !isTeacher && ['preTest', 'preScale', 'notReady'].includes(journey?.stage) ? (
+        <div className="p-10 text-center bg-card border rounded-3xl shadow-sm space-y-4">
+          <div className="w-16 h-16 bg-amber-500/10 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
+            <Lock size={32} />
+          </div>
+          <div className="space-y-2 max-w-lg mx-auto">
+            <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">الدروس التعليمية مقفلة حالياً</h3>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              وفقاً للتصميم التجريبي للبحث، يجب عليكِ أولاً إكمال{' '}
+              <span className="font-bold text-foreground">
+                {journey.stage === 'preTest' ? 'الاختبار التحصيلي القبلي' : 'مقياس السلوك والوعي الصحي القبلي'}
+              </span>{' '}
+              الموضح أعلاه لفتح دراسة الدروس التعليمية بالترتيب.
+            </p>
+          </div>
+        </div>
+      ) : (
       <div className="grid gap-4">
+
         {lessons.length === 0 ? (
           <div className="text-center py-20 bg-muted/30 rounded-3xl border-2 border-dashed">
             <BookOpen size={48} className="mx-auto text-muted-foreground mb-4 opacity-20" />
@@ -574,6 +593,8 @@ export function CourseLessons() {
           })
         )}
       </div>
+      )}
+
 
       {/* Edit Session Modal */}
       <AnimatePresence>

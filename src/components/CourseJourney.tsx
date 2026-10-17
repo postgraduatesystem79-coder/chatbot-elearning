@@ -50,12 +50,13 @@ export function CourseJourneyBoundary({ children }: { children: ReactNode }) {
         console.warn("CourseJourney load warning:", e);
         if (active) {
           setError(e.message || '');
-          // Keep a safe default data so lessons always display
+          const cfg = emptyConfig();
+          const prog = emptyProgress();
           setData({
-            config: emptyConfig(),
-            progress: emptyProgress(),
+            config: cfg,
+            progress: prog,
             lessonIds: [],
-            stage: 'ready',
+            stage: journeyStage(cfg, prog, []),
             canManage: isTeacher
           });
         }
@@ -63,11 +64,13 @@ export function CourseJourneyBoundary({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [courseId, user?.uid, isTeacher]);
 
+  const fallbackConfig = emptyConfig();
+  const fallbackProg = emptyProgress();
   const fallbackData: JourneyData = {
-    config: emptyConfig(),
-    progress: emptyProgress(),
+    config: fallbackConfig,
+    progress: fallbackProg,
     lessonIds: [],
-    stage: 'ready',
+    stage: journeyStage(fallbackConfig, fallbackProg, []),
     canManage: isTeacher
   };
   const currentData = data || fallbackData;
@@ -92,8 +95,8 @@ export function CourseJourneyBoundary({ children }: { children: ReactNode }) {
 
   return (
     <Context.Provider value={context}>
-      {!isTeacher && currentData.config.enabled && (needsPre || (lessonId && previousIncomplete))
-        ? <div className="space-y-6"><Link to={`/courses/${courseId}`} className="text-primary underline">العودة إلى مراحل المقرر</Link>{needsPre ? <JourneyStudentPanel courseId={courseId} /> : <p className="p-8 bg-card border rounded-xl">أكملي الدروس السابقة أولًا.</p>}</div>
+      {!isTeacher && currentData.config.enabled && (lessonId && (needsPre || previousIncomplete))
+        ? <div className="space-y-6 max-w-4xl mx-auto p-4"><Link to={`/courses/${courseId}`} className="text-primary hover:underline font-bold inline-flex items-center gap-2">&rarr; العودة إلى صفحة المقرر</Link>{needsPre ? <JourneyStudentPanel courseId={courseId} /> : <div className="p-8 bg-card border rounded-2xl text-center space-y-3"><p className="text-lg font-bold">يجب إكمال الدروس السابقة واجتياز تقييمها أولاً.</p><Link to={`/courses/${courseId}`} className="inline-block bg-primary text-primary-foreground px-6 py-2 rounded-xl font-bold">الانتقال للدروس</Link></div>}</div>
         : children}
     </Context.Provider>
   );
@@ -116,42 +119,309 @@ function JourneyStudentPanel({ courseId }: { courseId: string }) {
   const assessment = ['preTest', 'preScale', 'postTest', 'postScale'].includes(stage) ? stage as AssessmentStage : null;
   const isScale = assessment?.endsWith('Scale');
   const items = isScale ? data.config.scale.statements : data.config.test.questions;
+
+  const answeredCount = Object.keys(answers).length;
+  const totalCount = items?.length || 0;
+  const percent = totalCount > 0 ? Math.round((answeredCount / totalCount) * 100) : 0;
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!assessment || saving) return;
-    if (items.some((_, i) => answers[i] === undefined)) { toast.error('أجيبي عن جميع البنود أولًا'); return; }
+
+    // Check background fields for preTest
+    if (assessment === 'preTest' && data.config.backgroundFields?.length) {
+      const missingField = data.config.backgroundFields.find(f => !background[f.id]?.trim());
+      if (missingField) {
+        toast.error(`يرجى استكمال خانة (${missingField.label}) في البيانات الأولية أولاً`);
+        const bgEl = document.getElementById('background-fieldset');
+        if (bgEl) bgEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+    }
+
+    // Check all questions answered
+    const firstUnanswered = items.findIndex((_, i) => answers[i] === undefined);
+    if (firstUnanswered !== -1) {
+      toast.error(`يرجى الإجابة عن البند رقم (${firstUnanswered + 1}) أولاً`);
+      const el = document.getElementById(`journey-item-${firstUnanswered}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-2', 'ring-primary');
+        setTimeout(() => el.classList.remove('ring-2', 'ring-primary'), 3000);
+      }
+      return;
+    }
+
     setSaving(true);
     try {
-      await journeyRequest(courseId, '/attempt', { stage: assessment, answers: items.map((_, i) => answers[i]), ...(assessment === 'preTest' ? { background } : {}) });
-      await data.refresh(); toast.success('تم حفظ إجاباتك بنجاح');
-    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+      await journeyRequest(courseId, '/attempt', {
+        stage: assessment,
+        answers: items.map((_, i) => answers[i]),
+        ...(assessment === 'preTest' ? { background } : {})
+      });
+      await data.refresh();
+      toast.success(`تم حفظ إجاباتك في ${assessmentLabels[assessment]} بنجاح`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e: any) {
+      toast.error(e.message || 'حدث خطأ أثناء الحفظ');
+    } finally {
+      setSaving(false);
+    }
   };
-  return <section className="bg-card border rounded-2xl p-6 space-y-6" dir="rtl">
-    <h2 className="text-2xl font-bold">رحلة دراسة المقرر</h2>
-    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-      {(['preTest', 'preScale', 'content', 'postTest', 'postScale'] as const).map((key, i) => {
-        const done = key === 'content' ? data.lessonIds.length > 0 && data.lessonIds.every(id => data.progress.completedLessonIds.includes(id)) : !!data.progress.attempts[key];
-        return <div key={key} className={`p-3 rounded-xl border text-sm font-bold flex items-center gap-2 ${stage === key ? 'bg-primary text-primary-foreground' : 'bg-muted/40'}`}>
-          {done ? <CheckCircle2 size={18} /> : stage === key ? <span>{i + 1}</span> : <Lock size={16} />}{key === 'content' ? 'دراسة المحتوى' : assessmentLabels[key]}
-        </div>;
-      })}
-    </div>
-    {stage === 'notReady' && <p>سيظهر الاختبار والمقياس عند إكمال المعلم إعدادهما.</p>}
-    {stage === 'content' && <p className="text-muted-foreground">تم إكمال القياس القبلي. ادرسي الدروس بالترتيب؛ يظهر الاختبار والمقياس البعدي بعد إنهاء جميع الدروس. ({data.progress.completedLessonIds.filter(id => data.lessonIds.includes(id)).length} / {data.lessonIds.length})</p>}
-    {assessment && <form key={assessment} onSubmit={submit} className="space-y-6">
-      {assessment === 'preTest' && data.config.backgroundFields?.length && <fieldset className="p-5 border rounded-xl space-y-4"><legend className="font-bold px-2">البيانات الأولية</legend><p className="text-muted-foreground">{data.config.instructions}</p><div className="grid md:grid-cols-2 gap-4">{data.config.backgroundFields.map(field => <label key={field.id} className="space-y-2 block"><span>{field.label}</span>{field.options ? <select className="w-full border bg-background rounded-lg p-3" value={background[field.id] || ''} disabled={saving} onChange={e => setBackground(b => ({ ...b, [field.id]: e.target.value }))}><option value="">اختاري</option>{field.options.map(option => <option key={option}>{option}</option>)}</select> : <input className="w-full border bg-background rounded-lg p-3" maxLength={250} value={background[field.id] || ''} disabled={saving} onChange={e => setBackground(b => ({ ...b, [field.id]: e.target.value }))} />}</label>)}</div></fieldset>}
-      <div><h3 className="text-xl font-bold">{assessmentLabels[assessment]} — {isScale ? data.config.scale.title : data.config.test.title}</h3><p className="text-muted-foreground mt-2">{isScale ? 'اختاري درجة موافقتك على كل عبارة. لا توجد إجابة صحيحة أو خاطئة.' : 'اختاري إجابة واحدة لكل سؤال. هذا القياس لا يتطلب درجة نجاح لفتح المرحلة التالية.'} تُحفظ الإجابات نهائيًا عند الإرسال.</p></div>
-      {items.map((item, index) => <fieldset key={item.id} className="border rounded-xl p-5 space-y-3"><legend className="font-bold px-2">{isScale && statementResponse(data.config, index).section && <span className="block text-primary text-sm mb-2">{statementResponse(data.config, index).section!.title}</span>}{index + 1}. {item.text}</legend>
-        {(isScale ? statementResponse(data.config, index).options : data.config.test.questions[index].options).map((option, value) => <label key={value} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg cursor-pointer"><input required type="radio" name={`${assessment}-${item.id}`} value={value} checked={answers[index] === value} disabled={saving} onChange={() => setAnswers(previous => ({ ...previous, [index]: value }))} />{option}</label>)}
-      </fieldset>)}
-      <button disabled={saving} className="bg-primary text-primary-foreground px-8 py-3 rounded-xl font-bold disabled:opacity-50">{saving ? 'جاري الحفظ...' : `إرسال ${assessmentLabels[assessment]}`}</button>
-    </form>}
-    {stage === 'complete' && <div className="space-y-4"><h3 className="font-bold text-xl text-primary">أكملتِ دراسة المقرر والقياس البعدي</h3><div className="overflow-x-auto"><table className="w-full text-right"><thead><tr><th className="p-3">الأداة</th><th>قبلي</th><th>بعدي</th></tr></thead><tbody>{(['Test', 'Scale'] as const).map(type => {
-      const pre = data.progress.attempts[`pre${type}`]!; const post = data.progress.attempts[`post${type}`]!;
-      return <tr key={type} className="border-t"><td className="p-3">{type === 'Test' ? 'الاختبار' : 'المقياس'}</td><td>{pre.score} / {pre.maximum}</td><td>{post.score} / {post.maximum}</td></tr>;
-    })}{data.progress.attempts.preScale?.subscales?.map((subscale, i) => <tr className="border-t" key={subscale.title}><td className="p-3">{subscale.title}</td><td>{subscale.score} / {subscale.maximum}</td><td>{data.progress.attempts.postScale?.subscales?.[i]?.score} / {subscale.maximum}</td></tr>)}</tbody></table></div><p className="text-sm text-muted-foreground">يُصحح كل قسم وفق استجاباته ودرجاته، مع عكس تصحيح العبارات المعكوسة.</p></div>}
-  </section>;
+
+  return (
+    <section className="bg-card border rounded-3xl p-6 md:p-8 space-y-6 shadow-sm" dir="rtl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-5">
+        <div>
+          <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-3">
+            <span className="w-3 h-8 bg-primary rounded-full inline-block" />
+            رحلة دراسة المقرر والتجربة البحثية
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            وفقاً لمتطلبات البحث العلمي: يجب اجتياز القياسات القبلية، ثم إكمال الدروس المتتابعة، ويليهما القياس البعدي.
+          </p>
+        </div>
+      </div>
+
+      {/* Journey Stages Bar */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {(['preTest', 'preScale', 'content', 'postTest', 'postScale'] as const).map((key, i) => {
+          const done = key === 'content'
+            ? data.lessonIds.length > 0 && data.lessonIds.every(id => data.progress.completedLessonIds.includes(id))
+            : !!data.progress.attempts[key];
+          const isCurrent = stage === key;
+          return (
+            <div
+              key={key}
+              className={`p-3.5 rounded-2xl border text-sm font-bold flex items-center gap-2.5 transition-all ${
+                isCurrent
+                  ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]'
+                  : done
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                  : 'bg-muted/40 text-muted-foreground'
+              }`}
+            >
+              {done ? (
+                <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />
+              ) : isCurrent ? (
+                <span className="w-5 h-5 rounded-full bg-white text-primary flex items-center justify-center text-xs shrink-0 font-black">
+                  {i + 1}
+                </span>
+              ) : (
+                <Lock size={16} className="shrink-0 opacity-50" />
+              )}
+              <span className="truncate">{key === 'content' ? 'دراسة المحتوى' : assessmentLabels[key]}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {stage === 'notReady' && (
+        <div className="p-8 text-center bg-muted/20 border rounded-2xl">
+          <p className="font-bold text-muted-foreground">سيظهر الاختبار والمقياس عند اكتمال إعدادهما.</p>
+        </div>
+      )}
+
+      {stage === 'content' && (
+        <div className="p-5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-emerald-800 dark:text-emerald-200">
+          <p className="font-bold">
+            تهانينا! تم إكمال القياس القبلي بنجاح. يمكنكِ الآن دراسة الدروس التعليمية بالترتيب الموضح أدناه.
+          </p>
+          <p className="text-xs mt-1 text-emerald-700/80 dark:text-emerald-300/80">
+            تم إنجاز {data.progress.completedLessonIds.filter(id => data.lessonIds.includes(id)).length} من أصل {data.lessonIds.length} درساً. سيُفتح القياس البعدي فور الانتهاء من جميع الدروس.
+          </p>
+        </div>
+      )}
+
+      {assessment && (
+        <form key={assessment} onSubmit={submit} className="space-y-6 pt-2">
+          {/* Sticky Progress Indicator */}
+          <div className="sticky top-20 z-20 bg-background/95 backdrop-blur border rounded-2xl p-4 shadow-md flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
+                {answeredCount}/{totalCount}
+              </div>
+              <div>
+                <p className="font-bold text-sm">نسبة الإجابة عن {assessmentLabels[assessment]}</p>
+                <p className="text-xs text-muted-foreground">{percent}% مكتمل ({totalCount - answeredCount} متبقي)</p>
+              </div>
+            </div>
+            <div className="flex-1 min-w-[140px] max-w-xs bg-muted h-3 rounded-full overflow-hidden">
+              <div className="bg-primary h-full transition-all duration-300" style={{ width: `${percent}%` }} />
+            </div>
+            <div>
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs md:text-sm px-5 py-2.5 rounded-xl font-bold shadow-md shadow-primary/20 transition-all disabled:opacity-50"
+              >
+                {saving ? 'جاري الحفظ...' : `إرسال ${assessmentLabels[assessment]}`}
+              </button>
+            </div>
+          </div>
+
+          {/* Demographic Background Fields (for preTest) */}
+          {assessment === 'preTest' && data.config.backgroundFields?.length && (
+            <fieldset id="background-fieldset" className="p-6 border rounded-2xl space-y-4 bg-muted/20">
+              <legend className="font-bold px-3 py-1 bg-primary/10 text-primary rounded-lg text-sm">
+                البيانات الأولية للطالبة
+              </legend>
+              <p className="text-muted-foreground text-xs md:text-sm">{data.config.instructions}</p>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {data.config.backgroundFields.map(field => (
+                  <label key={field.id} className="space-y-1.5 block">
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      {field.label} <span className="text-destructive">*</span>
+                    </span>
+                    {field.options ? (
+                      <select
+                        required
+                        className="w-full border bg-background rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                        value={background[field.id] || ''}
+                        disabled={saving}
+                        onChange={e => setBackground(b => ({ ...b, [field.id]: e.target.value }))}
+                      >
+                        <option value="">اختاري {field.label}</option>
+                        {field.options.map(option => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        required
+                        className="w-full border bg-background rounded-xl p-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                        maxLength={250}
+                        placeholder={`أدخلي ${field.label}`}
+                        value={background[field.id] || ''}
+                        disabled={saving}
+                        onChange={e => setBackground(b => ({ ...b, [field.id]: e.target.value }))}
+                      />
+                    )}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+
+          {/* Assessment Title Header */}
+          <div className="p-5 bg-card border rounded-2xl">
+            <h3 className="text-xl font-black text-slate-800 dark:text-slate-100">
+              {assessmentLabels[assessment]} — {isScale ? data.config.scale.title : data.config.test.title}
+            </h3>
+            <p className="text-muted-foreground text-xs md:text-sm mt-1.5">
+              {isScale
+                ? 'اختاري درجة موافقتك على كل عبارة من العبارات التالية. لا توجد إجابة صحيحة أو خاطئة.'
+                : 'اختاري إجابة واحدة صحيحة لكل سؤال من الأسئلة التالية. القياس القبلي يهدف لتحديد المستوى المعرفي قبل البدء بالدراسة.'}
+            </p>
+          </div>
+
+          {/* Assessment Items */}
+          <div className="space-y-4">
+            {items.map((item, index) => {
+              const scaleResp = isScale ? statementResponse(data.config, index) : null;
+              const options = isScale ? scaleResp!.options : data.config.test.questions[index].options;
+              const isAnswered = answers[index] !== undefined;
+
+              return (
+                <fieldset
+                  key={item.id}
+                  id={`journey-item-${index}`}
+                  className={`border rounded-2xl p-5 space-y-3.5 transition-all bg-card ${
+                    isAnswered ? 'border-primary/40 bg-primary/[0.02]' : 'hover:border-slate-300'
+                  }`}
+                >
+                  <legend className="font-bold px-2 text-sm text-foreground flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground font-mono">
+                      {index + 1}
+                    </span>
+                    {isScale && scaleResp?.section && (
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
+                        {scaleResp.section.title}
+                      </span>
+                    )}
+                  </legend>
+
+                  <p className="font-medium text-base text-slate-800 dark:text-slate-200 leading-relaxed pr-2">
+                    {item.text}
+                  </p>
+
+                  <div className={`grid gap-2.5 pt-1 ${options.length <= 3 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                    {options.map((option, value) => {
+                      const selected = answers[index] === value;
+                      return (
+                        <label
+                          key={value}
+                          className={`flex items-center gap-3 p-3.5 rounded-xl border text-sm font-medium cursor-pointer transition-all ${
+                            selected
+                              ? 'bg-primary/10 border-primary text-primary font-bold shadow-sm'
+                              : 'bg-muted/30 border-transparent hover:bg-muted/60 text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name={`${assessment}-${item.id}`}
+                            value={value}
+                            checked={selected}
+                            disabled={saving}
+                            onChange={() => setAnswers(prev => ({ ...prev, [index]: value }))}
+                            className="w-4 h-4 text-primary focus:ring-primary"
+                          />
+                          <span>{option}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              );
+            })}
+          </div>
+
+          {/* Bottom Submit Button */}
+          <div className="pt-4 flex items-center justify-end">
+            <button
+              type="submit"
+              disabled={saving}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-10 py-3.5 rounded-2xl font-bold shadow-lg shadow-primary/25 text-base transition-all disabled:opacity-50"
+            >
+              {saving ? 'جاري الحفظ...' : `إرسال ${assessmentLabels[assessment]}`}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {stage === 'complete' && (
+        <div className="space-y-4 p-6 bg-card border rounded-2xl">
+          <h3 className="font-black text-xl text-primary">أكملتِ دراسة المقرر والقياس البعدي بنجاح</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right border-collapse">
+              <thead>
+                <tr className="border-b bg-muted/40">
+                  <th className="p-3 text-sm font-bold">الأداة</th>
+                  <th className="p-3 text-sm font-bold">الدرجة القبلية</th>
+                  <th className="p-3 text-sm font-bold">الدرجة البعدية</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(['Test', 'Scale'] as const).map(type => {
+                  const pre = data.progress.attempts[`pre${type}`];
+                  const post = data.progress.attempts[`post${type}`];
+                  return (
+                    <tr key={type} className="border-b">
+                      <td className="p-3 font-semibold">{type === 'Test' ? 'الاختبار التحصيلي' : 'المقياس'}</td>
+                      <td className="p-3">{pre ? `${pre.score} / ${pre.maximum}` : '—'}</td>
+                      <td className="p-3">{post ? `${post.score} / ${post.maximum}` : '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }
+
 
 function JourneyEditor({ courseId }: { courseId: string }) {
   const data = useCourseJourney()!;

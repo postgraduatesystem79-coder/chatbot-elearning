@@ -1,6 +1,7 @@
 import coursesJson from '../../local_db/courses.json';
 import sessionsJson from '../../local_db/sessions.json';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, getDoc } from 'firebase/firestore';
+import { defaultJourneyConfig } from './courseJourney';
 
 export const DEFAULT_COURSES: any[] = coursesJson;
 export const DEFAULT_SESSIONS: any[] = sessionsJson;
@@ -45,6 +46,15 @@ export async function syncDefaultDataToFirestore(db: any) {
         await setDoc(doc(db, 'sessions', session.id), session, { merge: true }).catch(() => {});
       }
     }
+
+    // 3. Sync default journey config
+    const journeyRef = doc(db, 'quizzes', `course-journey-${DEFAULT_COURSE.id}`);
+    const journeySnap = await getDoc(journeyRef).catch(() => null);
+    if (!journeySnap || !journeySnap.exists() || !journeySnap.data()?.config?.enabled) {
+      console.log('[Sync] Seeding default journey config into Firestore...');
+      await setDoc(journeyRef, { config: defaultJourneyConfig }, { merge: true }).catch(() => {});
+    }
+
   } catch (err) {
     console.warn('[Sync] Firestore seed error (safe to ignore in offline/static mode):', err);
   } finally {

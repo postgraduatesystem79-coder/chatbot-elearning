@@ -39,11 +39,13 @@ export function statementResponse(config: JourneyConfig, index: number) {
 export function compareJourneyLessons(a: { id: string; lessonNumber?: number }, b: { id: string; lessonNumber?: number }) {
   return (a.lessonNumber ?? Number.MAX_SAFE_INTEGER) - (b.lessonNumber ?? Number.MAX_SAFE_INTEGER) || a.id.localeCompare(b.id);
 }
+import defaultJourneyConfigJson from './defaultJourneyConfig.json';
+
+export const defaultJourneyConfig: JourneyConfig = defaultJourneyConfigJson as unknown as JourneyConfig;
+
 export const emptyProgress = (): JourneyProgress => ({ attempts: {}, completedLessonIds: [] });
-export const emptyConfig = (): JourneyConfig => ({
-  enabled: false, version: '', test: { title: 'اختبار التحصيل', questions: [] },
-  scale: { title: 'مقياس الوعي الصحي', statements: [] }
-});
+export const emptyConfig = (): JourneyConfig => JSON.parse(JSON.stringify(defaultJourneyConfig));
+
 export function validateConfig(config: JourneyConfig): void {
   if (!config || typeof config.enabled !== 'boolean' || !config.test || !config.scale ||
       !Array.isArray(config.test.questions) || !Array.isArray(config.scale.statements)) throw new Error('بيانات التقييم غير صالحة');
