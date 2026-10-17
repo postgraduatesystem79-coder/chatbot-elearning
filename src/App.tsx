@@ -24,6 +24,7 @@ import ChatRoom from './pages/ChatRoom';
 import KnowledgeBase from './pages/KnowledgeBase';
 import { Applications } from './pages/Applications';
 import { Toaster } from 'sonner';
+import { CourseJourneyBoundary } from './components/CourseJourney';
 import './i18n';
 
 
@@ -87,7 +88,7 @@ function AppRoutes() {
       <Route path="/courses/:id" element={
         <ProtectedRoute>
           <Layout>
-            <CourseLessons />
+            <CourseJourneyBoundary><CourseLessons /></CourseJourneyBoundary>
           </Layout>
         </ProtectedRoute>
       } />
@@ -95,7 +96,7 @@ function AppRoutes() {
       <Route path="/courses/:courseId/lessons/:lessonId" element={
         <ProtectedRoute>
           <Layout>
-            <CourseDetail />
+            <CourseJourneyBoundary><CourseDetail /></CourseJourneyBoundary>
           </Layout>
         </ProtectedRoute>
       } />

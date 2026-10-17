@@ -1,9 +1,9 @@
 {
-  "apiKey": "AIzaSyA8vkrQCUl5HLJE6WZAK9U-wy7V5DEWvnw",
-  "authDomain": "edumatrix-8637a.firebaseapp.com",
-  "projectId": "edumatrix-8637a",
-  "storageBucket": "edumatrix-8637a.firebasestorage.app",
-  "messagingSenderId": "1082718532649",
-  "appId": "1:1082718532649:web:07abae466dcfb893581838",
-  "measurementId": "G-6GPEF945NM"
+  "projectId": "gen-lang-client-0882855500",
+  "appId": "1:745262739724:web:28817d0b6ab1f102759929",
+  "storageBucket": "gen-lang-client-0882855500.firebasestorage.app",
+  "apiKey": "AIzaSyAWgmnmX4unJHSI--8l4sRaHVWz30xabpg",
+  "authDomain": "gen-lang-client-0882855500.firebaseapp.com",
+  "messagingSenderId": "745262739724",
+  "measurementId": "G-P0D7E5SPED"
 }

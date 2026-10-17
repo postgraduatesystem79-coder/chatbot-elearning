@@ -39,6 +39,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/useAuth';
 import { toast } from 'sonner';
 import { cn, getYouTubeEmbedUrl, normalizeEvaluation } from '../lib/utils';
+import { CourseJourneyPanel, useCourseJourney } from '../components/CourseJourney';
+import { compareJourneyLessons } from '../lib/courseJourney';
 
 interface Lesson {
   id: string;
@@ -52,6 +54,7 @@ export function CourseLessons() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { isTeacher, profile } = useAuth();
+  const journey = useCourseJourney();
   const [course, setCourse] = useState<any>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
@@ -301,7 +304,7 @@ export function CourseLessons() {
       liveLessons.forEach(lesson => merged.set(lesson.id, lesson));
       setLessons([...merged.values()]
         .filter(lesson => !deletedLessonIds.current.has(lesson.id))
-        .sort((a, b) => (a.lessonNumber || 0) - (b.lessonNumber || 0)));
+        .sort(compareJourneyLessons));
     };
     setLoading(true);
     setCourse(null);
@@ -413,6 +416,7 @@ export function CourseLessons() {
         )}
       </div>
 
+      <CourseJourneyPanel courseId={id!} />
       <div className="grid gap-4">
         {lessons.length === 0 ? (
           <div className="text-center py-20 bg-muted/30 rounded-3xl border-2 border-dashed">
@@ -433,7 +437,7 @@ export function CourseLessons() {
           lessons.map((lesson, index) => {
             // Check completion using both session-X key and lesson.id for compatibility
             const statsKey = lesson.lessonNumber ? `session-${lesson.lessonNumber}` : lesson.id;
-            const isCompleted = 
+            const isCompleted = journey?.config.enabled && !isTeacher ? journey.progress.completedLessonIds.includes(lesson.id) :
               profile?.stats?.completedLessons?.includes(statsKey) || 
               profile?.stats?.completedLessons?.includes(lesson.id) ||
               profile?.stats?.evaluationPerformance?.[statsKey] !== undefined ||
@@ -441,7 +445,9 @@ export function CourseLessons() {
             
             const prevLesson = lessons[index - 1];
             const prevStatsKey = prevLesson?.lessonNumber ? `session-${prevLesson.lessonNumber}` : prevLesson?.id;
-            const isPreviousCompleted = index === 0 || (prevLesson && (
+            const isPreviousCompleted = journey?.config.enabled && !isTeacher
+              ? lessons.slice(0, index).every(previous => journey.progress.completedLessonIds.includes(previous.id))
+              : index === 0 || (prevLesson && (
               profile?.stats?.completedLessons?.includes(prevStatsKey) || 
               profile?.stats?.completedLessons?.includes(prevLesson.id) ||
               profile?.stats?.evaluationPerformance?.[prevStatsKey] !== undefined ||

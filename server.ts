@@ -15,6 +15,8 @@ import { initializeApp } from "firebase/app";
 import admin from "firebase-admin";
 import fs from "fs";
 import cors from "cors";
+import { createCourseJourneyRouter } from './server/courseJourney';
+import { compareJourneyLessons } from './src/lib/courseJourney';
 
 // ===================== Simple MemoryVectorStore =====================
 class MemoryVectorStore {
@@ -218,6 +220,28 @@ if (fs.existsSync(firebaseConfigPath)) {
   }
 
   // ===================== Courses & Lessons Endpoints =====================
+  app.use('/api/course-journey', createCourseJourneyRouter({
+    directory: DB_DIR,
+    authenticate: async token => admin.auth().verifyIdToken(token),
+    getCourse: async courseId => {
+      const local = readLocalCourses().find(c => c.id === courseId);
+      if (local) return local;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        const snapshot = await admin.firestore().collection('courses').doc(courseId).get();
+        if (snapshot.exists) return { id: snapshot.id, ...snapshot.data() };
+      }
+      return null;
+    },
+    getLessons: async courseId => {
+      const deletedIds = readDeletedSessionIds();
+      const merged = new Map(readLocalSessions().filter(s => s.courseId === courseId).map(s => [s.id, s]));
+      if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        const snapshot = await admin.firestore().collection('sessions').where('courseId', '==', courseId).get();
+        snapshot.docs.forEach(d => merged.set(d.id, { id: d.id, ...d.data() }));
+      }
+      return [...merged.values()].filter(s => !deletedIds.includes(s.id) && s.status !== 'draft').sort(compareJourneyLessons);
+    }
+  }));
   app.get("/api/courses", async (_req, res) => {
     try {
       if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {

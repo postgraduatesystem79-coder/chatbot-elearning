@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "clothing-ai-health",
     "public": "dist",
     "ignore": [
       "firebase.json",
@@ -12,8 +13,5 @@
         "destination": "/index.html"
       }
     ]
-  },
-  "firestore": {
-    "rules": "firestore.rules"
   }
 }

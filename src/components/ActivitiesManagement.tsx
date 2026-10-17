@@ -9,6 +9,7 @@ import {
   where, 
   doc, 
   updateDoc, 
+  setDoc,
   deleteDoc, 
   serverTimestamp,
   addDoc,
@@ -27,11 +28,15 @@ import {
   Loader2,
   AlertCircle,
   FileText,
-  ExternalLink
+  ExternalLink,
+  Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
+import { compareJourneyLessons } from '../lib/courseJourney';
+import { sessionUpdatedAt } from '../lib/sessionVersion';
 
 interface Activity {
   id: string;
@@ -39,6 +44,7 @@ interface Activity {
   description: string;
   startDate?: string;
   endDate?: string;
+  type?: string;
 }
 
 interface Session {
@@ -46,6 +52,7 @@ interface Session {
   title: string;
   lessonNumber?: number;
   activities?: Activity[];
+  courseId?: string;
 }
 
 export function ActivitiesManagement() {
@@ -68,14 +75,70 @@ export function ActivitiesManagement() {
   const [gradeValue, setGradeValue] = useState<number>(100);
   const [feedbackValue, setFeedbackValue] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  const [activitiesRevision, setActivitiesRevision] = useState(0);
+  const [newActivity, setNewActivity] = useState({ sessionId: '', title: '', description: '', type: 'individual', startDate: '', endDate: '' });
+
+  const handleAddActivity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isAdding || !isTeacher) return;
+    if (!newActivity.sessionId || !newActivity.title.trim() || !newActivity.description.trim()) {
+      toast.error('اختاري الدرس وأدخلي عنوان النشاط وتعليماته'); return;
+    }
+    if (newActivity.startDate && newActivity.endDate && newActivity.endDate < newActivity.startDate) {
+      toast.error('تاريخ النهاية يجب ألا يسبق تاريخ البداية'); return;
+    }
+    setIsAdding(true);
+    try {
+      const response = await fetch(`/api/sessions/${encodeURIComponent(newActivity.sessionId)}`, { signal: AbortSignal.timeout(15000) });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error('تعذر تحميل بيانات الدرس');
+      const activity = { id: crypto.randomUUID(), title: newActivity.title.trim(), description: newActivity.description.trim(), type: newActivity.type, startDate: newActivity.startDate, endDate: newActivity.endDate };
+      const activities = [...(result.session.activities || []), activity];
+      const updatedAt = new Date().toISOString();
+      const saved = await fetch('/api/sessions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(15000),
+        body: JSON.stringify({ id: newActivity.sessionId, courseId: result.session.courseId, createdAt: result.session.createdAt, activities, updatedAt })
+      });
+      const savedResult = await saved.json();
+      if (!saved.ok || !savedResult.success) throw new Error(savedResult.error || 'تعذر حفظ النشاط');
+      setSessions(previous => previous.map(session => session.id === newActivity.sessionId ? { ...session, activities } : session));
+      setDoc(doc(db, 'sessions', newActivity.sessionId), { courseId: result.session.courseId || '', activities, updatedAt }, { merge: true }).catch(error => console.warn('Activity cloud sync pending:', error));
+      setIsAddOpen(false);
+      setActivitiesRevision(value => value + 1);
+      setNewActivity({ sessionId: '', title: '', description: '', type: 'individual', startDate: '', endDate: '' });
+      toast.success('تمت إضافة النشاط وسيظهر داخل الدرس المحدد');
+    } catch (error: any) { toast.error(error.message || 'تعذر إضافة النشاط'); }
+    finally { setIsAdding(false); }
+  };
 
   useEffect(() => {
+    let active = true;
+    let apiSessions: Session[] = [];
+    let cloudSessions: Session[] = [];
+    let deletedIds: string[] = [];
+    const mergeSessions = () => {
+      if (!active) return;
+      const merged = new Map(cloudSessions.map(s => [s.id, s]));
+      apiSessions.forEach(s => {
+        const cloud = merged.get(s.id);
+        merged.set(s.id, cloud && sessionUpdatedAt(cloud) > sessionUpdatedAt(s) ? { ...s, ...cloud } : { ...cloud, ...s });
+      });
+      setSessions([...merged.values()].filter(s => !deletedIds.includes(s.id)).sort(compareJourneyLessons));
+    };
+    fetch('/api/sessions', { signal: AbortSignal.timeout(15000) }).then(r => r.json()).then(result => {
+      if (result.success && Array.isArray(result.sessions)) { apiSessions = result.sessions; deletedIds = result.deletedIds || []; mergeSessions(); }
+    }).catch(error => console.warn('Activity lessons API unavailable:', error)).finally(() => { if (active) setLoading(false); });
     const sessionsRef = collection(db, 'sessions');
     const unsubscribeSessions = onSnapshot(sessionsRef, (snapshot) => {
       const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Session[];
-      setSessions(list.sort((a, b) => (a.lessonNumber || 0) - (b.lessonNumber || 0)));
+      cloudSessions = list;
+      mergeSessions();
+      if (active) setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'sessions');
+      if (active) setLoading(false);
     });
 
     const subsRef = collection(db, 'submissions');
@@ -102,10 +165,11 @@ export function ActivitiesManagement() {
     });
 
     return () => {
+      active = false;
       unsubscribeSessions();
       unsubscribeSubmissions();
     };
-  }, [isTeacher, user?.uid, gradingSubmission?.id]);
+  }, [isTeacher, user?.uid, gradingSubmission?.id, activitiesRevision]);
 
   useEffect(() => {
     if (!isTeacher) return;
@@ -263,6 +327,17 @@ export function ActivitiesManagement() {
 
   return (
     <div className="space-y-8" dir="rtl">
+      {isTeacher && <div className="flex justify-end"><button onClick={() => setIsAddOpen(true)} className="bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold flex items-center gap-2"><Plus size={20} />إضافة نشاط</button></div>}
+      {isTeacher && isAddOpen && <div className="fixed inset-0 z-50 p-4 bg-background/80 backdrop-blur-sm flex items-center justify-center"><form onSubmit={handleAddActivity} className="bg-card border shadow-xl rounded-2xl p-6 space-y-4 w-full max-w-xl max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-label="إضافة نشاط للدرس">
+        <div className="flex justify-between items-center"><h3 className="text-xl font-bold">إضافة نشاط للدرس</h3><button type="button" disabled={isAdding} aria-label="إغلاق" onClick={() => setIsAddOpen(false)}><X size={20} /></button></div>
+        <label className="block space-y-2"><span>الدرس</span><select required className="w-full bg-background border rounded-xl p-3" value={newActivity.sessionId} onChange={e => setNewActivity({ ...newActivity, sessionId: e.target.value })}><option value="">اختاري الدرس</option>{sessions.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}</select></label>
+        {!sessions.length && <p className="text-muted-foreground">أضيفي درسًا من المحتوى التعليمي أولًا.</p>}
+        <label className="block space-y-2"><span>عنوان النشاط</span><input required maxLength={200} className="w-full bg-background border rounded-xl p-3" value={newActivity.title} onChange={e => setNewActivity({ ...newActivity, title: e.target.value })} /></label>
+        <label className="block space-y-2"><span>تعليمات النشاط</span><textarea required rows={4} className="w-full bg-background border rounded-xl p-3" value={newActivity.description} onChange={e => setNewActivity({ ...newActivity, description: e.target.value })} /></label>
+        <label className="block space-y-2"><span>نوع النشاط</span><select className="w-full bg-background border rounded-xl p-3" value={newActivity.type} onChange={e => setNewActivity({ ...newActivity, type: e.target.value })}><option value="individual">فردي</option><option value="group">جماعي</option></select></label>
+        <div className="grid sm:grid-cols-2 gap-4"><label className="space-y-2"><span>تاريخ البداية (اختياري)</span><input type="date" className="w-full bg-background border rounded-xl p-3" value={newActivity.startDate} onChange={e => setNewActivity({ ...newActivity, startDate: e.target.value })} /></label><label className="space-y-2"><span>تاريخ النهاية (اختياري)</span><input type="date" min={newActivity.startDate || undefined} className="w-full bg-background border rounded-xl p-3" value={newActivity.endDate} onChange={e => setNewActivity({ ...newActivity, endDate: e.target.value })} /></label></div>
+        <div className="flex gap-3"><button type="submit" disabled={isAdding || !sessions.length} className="bg-primary text-primary-foreground rounded-xl px-6 py-3 font-bold disabled:opacity-50">{isAdding ? 'جاري الحفظ...' : 'حفظ النشاط'}</button><button type="button" disabled={isAdding} onClick={() => setIsAddOpen(false)} className="border rounded-xl px-6 py-3">إلغاء</button></div>
+      </form></div>}
       {/* Header Info */}
       <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 flex items-center gap-4">
         <div className="p-3 bg-primary/10 rounded-xl text-primary">
@@ -289,6 +364,7 @@ export function ActivitiesManagement() {
                 {session.lessonNumber}
               </div>
               <h3 className="font-bold text-lg">{session.title}</h3>
+              {session.courseId && <Link to={`/courses/${session.courseId}/lessons/${session.id}`} className="text-primary text-sm font-bold underline">فتح الدرس</Link>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

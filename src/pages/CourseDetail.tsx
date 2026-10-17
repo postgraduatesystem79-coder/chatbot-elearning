@@ -46,6 +46,8 @@ import { doc, onSnapshot, setDoc, serverTimestamp, updateDoc, increment, getDoc,
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { storage } from '../lib/firebase';
 import { AIInteractiveActivity } from '../components/AIInteractiveActivity';
+import { useCourseJourney } from '../components/CourseJourney';
+import { sessionUpdatedAt } from '../lib/sessionVersion';
 
 export function CourseDetail() {
   const { courseId, lessonId } = useParams();
@@ -53,6 +55,7 @@ export function CourseDetail() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, isTeacher, isAdmin } = useAuth();
+  const journey = useCourseJourney();
 
   // Helper to get stats key (session-1, session-2, etc.)
   const getStatsKey = () => {
@@ -221,7 +224,7 @@ export function CourseDetail() {
 
   // Fetch all lessons to check sequential access
   useEffect(() => {
-    if (!courseId || !lessonId || isTeacher) return;
+    if (!courseId || !lessonId || isTeacher || journey?.config.enabled) return;
 
     const sessionsRef = collection(db, 'sessions');
     const q = query(sessionsRef, where('courseId', '==', courseId));
@@ -249,7 +252,7 @@ export function CourseDetail() {
     });
 
     return () => unsubscribe();
-  }, [courseId, lessonId, isTeacher, profile?.stats?.completedLessons, profile?.stats?.evaluationPerformance]);
+  }, [courseId, lessonId, isTeacher, journey?.config.enabled, profile?.stats?.completedLessons, profile?.stats?.evaluationPerformance]);
 
   // Fetch session data with resilient API fallback
   useEffect(() => {
@@ -261,7 +264,7 @@ export function CourseDetail() {
       .then(json => {
         if (json.success && json.session) {
           const data = json.session;
-          setSessionData({
+          setSessionData(previous => sessionUpdatedAt(previous) > sessionUpdatedAt(data) ? previous : {
             ...data,
             evaluation: normalizeEvaluation(data.evaluation || [])
           });
@@ -291,7 +294,7 @@ export function CourseDetail() {
       if (docSnap.exists()) {
         setLoadedLessonId(sessionId);
         const data = docSnap.data() as any;
-        setSessionData({
+        setSessionData(previous => sessionUpdatedAt(previous) > sessionUpdatedAt(data) ? previous : {
           ...data,
           evaluation: normalizeEvaluation(data.evaluation || [])
         });
@@ -406,10 +409,19 @@ export function CourseDetail() {
   }, [selectedContent, profile?.uid]);
 
   const handleEvaluation = async () => {
+    if (isSaving) return;
     const correctCount = sessionData.evaluation.filter((q, idx) => quizAnswers[idx] === q.correctId).length;
     const totalQuestions = sessionData.evaluation.length || 1;
     const scorePercent = Math.round((correctCount / totalQuestions) * 100);
     const isPassed = scorePercent >= 85;
+    if (isPassed && journey?.config.enabled && !isTeacher && lessonId) {
+      setIsSaving(true);
+      try {
+        await journey.completeLesson(lessonId, sessionData.evaluation.map((q, index) => q.options.findIndex((o: any) => o.id === quizAnswers[index])));
+      } catch (error: any) {
+        toast.error(error.message); return;
+      } finally { setIsSaving(false); }
+    }
     
     setEvaluationScore(scorePercent);
     setIsCorrect(isPassed);
@@ -426,7 +438,7 @@ export function CourseDetail() {
         const totalLessons = allLessons.length || 7;
         const progressPercent = Math.round((newCompletedCount / totalLessons) * 100);
 
-        await updateDoc(statsRef, {
+        void updateDoc(statsRef, {
           [`stats.evaluationPerformance.${getStatsKey()}`]: scorePercent,
           [`stats.completedLessons`]: arrayUnion(getStatsKey()),
           [`stats.coursesCompleted`]: increment(1),
@@ -439,7 +451,7 @@ export function CourseDetail() {
       // Save failed attempt with score percentage
       if (profile?.uid && lessonId) {
         const statsRef = doc(db, 'users', profile.uid);
-        await updateDoc(statsRef, {
+        void updateDoc(statsRef, {
           [`stats.evaluationPerformance.${getStatsKey()}`]: scorePercent // Save percentage even if failed
         }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}/stats/evaluation`));
       }
@@ -1035,12 +1047,6 @@ export function CourseDetail() {
               )}
               <div className="grid gap-4">
                 {sessionData.activities
-                  .filter((_, index) => {
-                    if (isTeacher || isAdmin) return true;
-                    if (failCount === 0) return index === 0;
-                    if (failCount === 1) return index === 1;
-                    return true; // Show all for more failures
-                  })
                   .map((act) => (
                     <div key={act.id} className="p-6 bg-card border border-border rounded-2xl shadow-sm hover:shadow-md transition-all space-y-4 group">
                     <div className="flex flex-col md:flex-row gap-6">
@@ -1359,6 +1365,17 @@ export function CourseDetail() {
                       <HelpCircle size={48} strokeWidth={1} />
                     </div>
                     <p className="text-muted-foreground font-bold">لا توجد أسئلة تقييم متاحة حالياً لهذا الدرس.</p>
+                    {journey?.config.enabled && !isTeacher && <button
+                      disabled={isSaving}
+                      className="bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold disabled:opacity-50"
+                      onClick={async () => {
+                        if (isSaving || !lessonId) return;
+                        setIsSaving(true);
+                        try { await journey.completeLesson(lessonId); navigate(`/courses/${courseId}`); }
+                        catch (e: any) { toast.error(e.message); }
+                        finally { setIsSaving(false); }
+                      }}
+                    >{isSaving ? 'جاري حفظ التقدم...' : 'إنهاء دراسة الدرس والعودة للمقرر'}</button>}
                   </div>
                 )}
               </div>
@@ -1381,7 +1398,7 @@ export function CourseDetail() {
                   currentQuestionIndex < sessionData.evaluation.length - 1 ? (
                     <button 
                       onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
-                      disabled={!quizAnswers[currentQuestionIndex]}
+                      disabled={isSaving || !quizAnswers[currentQuestionIndex]}
                       className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all disabled:opacity-50"
                     >
                       السؤال التالي
@@ -1389,7 +1406,7 @@ export function CourseDetail() {
                   ) : (
                     <button 
                       onClick={handleEvaluation}
-                      disabled={!quizAnswers[currentQuestionIndex]}
+                      disabled={isSaving || !quizAnswers[currentQuestionIndex]}
                       className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all disabled:opacity-50"
                     >
                       إرسال الإجابة
@@ -1440,12 +1457,12 @@ export function CourseDetail() {
                         setSecondsElapsed(0);
                         setHasFailed(false);
                       } else {
-                        navigate('/courses');
+                        navigate(`/courses/${courseId}`);
                       }
                     }}
                     className="bg-primary text-primary-foreground px-12 py-4 rounded-xl font-bold text-lg hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
                   >
-                    انتقل للدرس التالي
+                    {journey?.config.enabled ? 'متابعة مراحل المقرر' : 'انتقل للدرس التالي'}
                   </button>
                 </>
               ) : (

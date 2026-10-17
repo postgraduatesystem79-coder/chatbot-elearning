@@ -42,9 +42,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return null;
   });
 
-  const [loading, setLoading] = useState<boolean>(() => {
-    return !localStorage.getItem('auth_user');
-  });
+  const [loading, setLoading] = useState(true);
 
   const [roleOverride, setRoleOverride] = useState<'teacher' | 'student' | 'admin' | null>(() => {
     return (localStorage.getItem('app_role') as any) || 'teacher';
@@ -73,14 +71,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  // Force loading=false after 2 seconds no matter what
-  useEffect(() => {
-    const forceTimer = setTimeout(() => {
-      setLoading(false);
-    }, 2000);
-    return () => clearTimeout(forceTimer);
-  }, []);
-
   useEffect(() => {
     try {
       const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
@@ -94,14 +84,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(firebaseUser);
           localStorage.setItem('auth_user', JSON.stringify(authData));
         } else {
-          // If explicit logout was triggered, clear
-          if (localStorage.getItem('explicit_logout')) {
-            setUser(null);
-            setProfile(null);
-            localStorage.removeItem('auth_user');
-            localStorage.removeItem('auth_profile');
-            localStorage.removeItem('explicit_logout');
-          }
+          // Cached names are not an authenticated session, including after a project change.
+          setUser(null);
+          setProfile(null);
+          localStorage.removeItem('auth_user');
+          localStorage.removeItem('auth_profile');
+          localStorage.removeItem('explicit_logout');
         }
         setLoading(false);
       }, (error) => {
