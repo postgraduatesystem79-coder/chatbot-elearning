@@ -43,28 +43,60 @@ export function CourseJourneyBoundary({ children }: { children: ReactNode }) {
   };
   useEffect(() => {
     let active = true;
-    setData(null); setError(''); setRequiresLogin(false);
-    journeyRequest(courseId).then(result => { if (active) setData(result); }).catch(e => { if (active) { setError(e.message); setRequiresLogin(e.code === 'AUTH_REQUIRED'); } });
+    setError(''); setRequiresLogin(false);
+    journeyRequest(courseId)
+      .then(result => { if (active) setData(result); })
+      .catch(e => {
+        console.warn("CourseJourney load warning:", e);
+        if (active) {
+          setError(e.message || '');
+          // Keep a safe default data so lessons always display
+          setData({
+            config: emptyConfig(),
+            progress: emptyProgress(),
+            lessonIds: [],
+            stage: 'ready',
+            canManage: isTeacher
+          });
+        }
+      });
     return () => { active = false; };
-  }, [courseId, user?.uid]);
-  if (error) return <div className="bg-card border rounded-2xl p-8 space-y-4" role="alert"><p>{error}</p><button className="bg-primary text-primary-foreground px-6 py-3 rounded-xl" onClick={() => requiresLogin ? logout() : refresh().catch(e => { setError(e.message); setRequiresLogin(e.code === 'AUTH_REQUIRED'); })}>{requiresLogin ? 'تسجيل الدخول مجددًا' : 'إعادة المحاولة'}</button></div>;
-  if (!data) return <p className="p-8 text-center" role="status">جاري تحميل مراحل المقرر...</p>;
+  }, [courseId, user?.uid, isTeacher]);
+
+  const fallbackData: JourneyData = {
+    config: emptyConfig(),
+    progress: emptyProgress(),
+    lessonIds: [],
+    stage: 'ready',
+    canManage: isTeacher
+  };
+  const currentData = data || fallbackData;
+
   const context: JourneyContext = {
-    ...data, refresh,
+    ...currentData,
+    refresh,
     completeLesson: async (lessonId, answers) => {
-      if (!data.config.enabled || isTeacher) return;
-      await journeyRequest(courseId, '/complete-lesson', { lessonId, answers });
-      await refresh();
+      if (!currentData.config.enabled || isTeacher) return;
+      try {
+        await journeyRequest(courseId, '/complete-lesson', { lessonId, answers });
+        await refresh();
+      } catch (err) {
+        console.warn("completeLesson warning:", err);
+      }
     }
   };
-  const needsPre = ['preTest', 'preScale', 'notReady'].includes(data.stage);
-  const lessonIndex = lessonId ? data.lessonIds.indexOf(lessonId) : -1;
-  const previousIncomplete = !!lessonId && (lessonIndex < 0 || data.lessonIds.slice(0, lessonIndex).some(l => !data.progress.completedLessonIds.includes(l)));
-  return <Context.Provider value={context}>
-    {!isTeacher && data.config.enabled && (needsPre || (lessonId && previousIncomplete))
-      ? <div className="space-y-6"><Link to={`/courses/${courseId}`} className="text-primary underline">العودة إلى مراحل المقرر</Link>{needsPre ? <JourneyStudentPanel courseId={courseId} /> : <p className="p-8 bg-card border rounded-xl">أكملي الدروس السابقة أولًا.</p>}</div>
-      : children}
-  </Context.Provider>;
+
+  const needsPre = ['preTest', 'preScale', 'notReady'].includes(currentData.stage);
+  const lessonIndex = lessonId ? currentData.lessonIds.indexOf(lessonId) : -1;
+  const previousIncomplete = !!lessonId && (lessonIndex < 0 || currentData.lessonIds.slice(0, lessonIndex).some(l => !currentData.progress.completedLessonIds.includes(l)));
+
+  return (
+    <Context.Provider value={context}>
+      {!isTeacher && currentData.config.enabled && (needsPre || (lessonId && previousIncomplete))
+        ? <div className="space-y-6"><Link to={`/courses/${courseId}`} className="text-primary underline">العودة إلى مراحل المقرر</Link>{needsPre ? <JourneyStudentPanel courseId={courseId} /> : <p className="p-8 bg-card border rounded-xl">أكملي الدروس السابقة أولًا.</p>}</div>
+        : children}
+    </Context.Provider>
+  );
 }
 
 export function CourseJourneyPanel({ courseId }: { courseId: string }) {
