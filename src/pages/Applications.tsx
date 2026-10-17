@@ -1,27 +1,24 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
-  Video, 
+  BookOpen,
   Image as ImageIcon, 
   Mic, 
   Cpu, 
   ExternalLink,
   Sparkles,
-  Wand2,
-  PlayCircle
+  Wand2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
 const aiTools = [
   {
-    category: "Video Production",
-    categoryAr: "إنتاج الفيديو",
-    icon: Video,
+    category: "Learning & Research",
+    categoryAr: "التعلم والبحث",
+    icon: BookOpen,
     color: "bg-blue-500",
     tools: [
-      { name: "HeyGen", description: "Create AI avatars that speak your text.", descriptionAr: "إنشاء صور رمزية تتحدث بنصوصك." },
-      { name: "Sora", description: "Generate realistic videos from text descriptions.", descriptionAr: "توليد فيديوهات واقعية من الأوصاف النصية." },
-      { name: "Runway", description: "AI tools for professional video editing.", descriptionAr: "أدوات ذكاء اصطناعي لتحرير الفيديو بمنتهى الاحترافية." }
+      { name: "NotebookLM", url: "https://notebooklm.google.com/", description: "Explore your sources, summarize lessons, and organize your study materials.", descriptionAr: "تلخيص الدروس وفهم المصادر وتنظيم المحتوى التعليمي." }
     ]
   },
   {
@@ -30,9 +27,7 @@ const aiTools = [
     icon: ImageIcon,
     color: "bg-emerald-500",
     tools: [
-      { name: "Midjourney", description: "High-quality artistic image generation.", descriptionAr: "توليد صور فنية عالية الجودة." },
-      { name: "DALL-E 3", description: "Precise and creative images from OpenAI.", descriptionAr: "صور دقيقة وإبداعية من OpenAI." },
-      { name: "Leonardo AI", description: "Professional creative assets generation.", descriptionAr: "توليد أصول إبداعية احترافية." }
+      { name: "Gemini", url: "https://gemini.google.com/", description: "Create and edit images using text descriptions.", descriptionAr: "إنشاء الصور وتعديلها باستخدام الأوصاف النصية." }
     ]
   },
   {
@@ -41,9 +36,7 @@ const aiTools = [
     icon: Mic,
     color: "bg-amber-500",
     tools: [
-      { name: "ElevenLabs", description: "The most realistic AI voice generator.", descriptionAr: "مولد الأصوات الأكثر واقعية بالذكاء الاصطناعي." },
-      { name: "Adobe Podcast", description: "Enhance speech for professional audio.", descriptionAr: "تحسين الكلام للحصول على صوت احترافي." },
-      { name: "Murf AI", description: "Versatile AI voices for any content.", descriptionAr: "أصوات ذكاء اصطناعي متنوعة لأي محتوى." }
+      { name: "ElevenLabs", url: "https://elevenlabs.io/", description: "Turn text into speech and create educational voiceovers.", descriptionAr: "تحويل النصوص إلى كلام وإنشاء التعليق الصوتي للمحتوى التعليمي." }
     ]
   }
 ];
@@ -68,8 +61,8 @@ export function Applications() {
         </h1>
         <p className="text-xl text-muted-foreground leading-relaxed">
           {isAr 
-            ? 'اكتشف كيف يمكنك استخدام قوة الذكاء الاصطناعي لإنتاج محتوى تعليمي احترافي يتضمن الفيديو والصور والصوت.'
-            : 'Explore how you can use the power of AI to produce professional educational content including video, images, and audio.'}
+            ? 'اكتشف كيف يمكنك استخدام قوة الذكاء الاصطناعي لإنتاج محتوى تعليمي احترافي يشمل البحث وتلخيص الدروس والصور والصوت.'
+            : 'Explore how you can use the power of AI to produce professional educational content including research, lesson summaries, images, and audio.'}
         </p>
       </div>
 
@@ -93,23 +86,23 @@ export function Applications() {
 
               <div className="space-y-6">
                 {cat.tools.map((tool, tIdx) => (
-                  <div key={tIdx} className="group cursor-pointer">
+                  <a key={tIdx} href={tool.url} target="_blank" rel="noopener noreferrer" className="group block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
                     <div className="flex items-center justify-between mb-1">
                       <h3 className="font-bold text-foreground group-hover:text-primary transition-colors">{tool.name}</h3>
-                      <ExternalLink size={14} className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-all" />
+                      <ExternalLink size={14} className="text-muted-foreground group-hover:text-primary transition-all" />
                     </div>
                     <p className="text-sm text-muted-foreground leading-snug">
                       {isAr ? tool.descriptionAr : tool.description}
                     </p>
-                  </div>
+                  </a>
                 ))}
               </div>
 
               <div className="mt-8 pt-6 border-t">
-                <button className="w-full py-4 bg-muted hover:bg-primary hover:text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2">
-                  <PlayCircle size={20} />
-                  <span>{isAr ? 'عرض أمثلة' : 'View Examples'}</span>
-                </button>
+                <a href={cat.tools[0].url} target="_blank" rel="noopener noreferrer" className="w-full py-4 bg-muted hover:bg-primary hover:text-primary-foreground rounded-2xl font-bold transition-all flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+                  <ExternalLink size={20} />
+                  <span>{isAr ? 'فتح الموقع' : 'Open Website'}</span>
+                </a>
               </div>
             </div>
           </motion.div>

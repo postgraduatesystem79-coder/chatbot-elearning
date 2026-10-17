@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { collection, onSnapshot, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, increment } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { collection, onSnapshot, query, where, addDoc, setDoc, serverTimestamp, doc, updateDoc, deleteDoc, increment } from 'firebase/firestore';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Search, 
@@ -87,16 +87,19 @@ export function CourseList() {
         body: JSON.stringify(newLessonData)
       });
       const resData = await res.json();
+      if (!res.ok || !resData.success || !resData.id) {
+        throw new Error(resData.error || 'تعذر حفظ الدرس');
+      }
       if (resData.success && resData.id) {
         createdLessonId = resData.id;
         toast.success(`تم إضافة "${lessonTitle}" بنجاح`);
       }
 
       // 2. Also try Firestore in background without awaiting
-      addDoc(collection(db, 'sessions'), {
+      setDoc(doc(db, 'sessions', createdLessonId!), {
         ...newLessonData,
         createdAt: serverTimestamp(),
-      }).catch(() => {});
+      }, { merge: true }).catch(() => {});
     } catch (err: any) {
       console.error('Lesson save failed:', err);
       toast.error(`تعذر إضافة الدرس: ${err.message || 'خطأ غير معروف'}`);
@@ -107,7 +110,7 @@ export function CourseList() {
         setIsAddLessonModalOpen(false);
         setSelectedCourseForLesson('');
         setNewLessonTitle('');
-        navigate(`/courses/${targetCourse}/lessons/${createdLessonId}`);
+        navigate(`/courses/${targetCourse}/lessons/${createdLessonId}?edit=content`);
       }
     }
   };

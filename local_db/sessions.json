@@ -1,245 +1,389 @@
 [
   {
-    "id": "session_lesson_1",
     "courseId": "course_1792174732543_4i1dv",
+    "title": "مفهوم مكملات الملابس وانواعها",
     "lessonNumber": 1,
-    "title": "الدرس الأول: تطبيقات الذكاء الاصطناعي لتنمية الوعي الصحي بمكملات الملابس",
-    "description": "مقدمة شاملة حول توظيف تقنيات الذكاء الاصطناعي في تحليل الخامات والمعايير الصحية السليمة لاختيار مكملات الملابس، والوقاية من المشكلات الجلدية والصحية المرتبطة بها.",
-    "generalObjective": "تنمية الوعي الصحي لدى الطالبات بالمعايير والاشتراطات الصحية الواجب مراعاتها عند اختيار واستخدام مكملات الملابس، وتوظيف أدوات وتطبيقات الذكاء الاصطناعي في اتخاذ قرارات صحية آمنة.",
+    "description": "محتوى الدرس 1",
+    "webUrl": "",
+    "videoUrl": "https://www.youtube.com/embed/idvYvqBRCoc",
+    "code": "",
+    "robotInstructions": "",
     "objectives": [
-      "التعرف على مفهوم مكملات الملابس وأهميتها الجمالية والوظيفية والصحية.",
-      "تحديد المخاطر الصحية الناتجة عن سوء اختيار مكملات الملابس (الحساسية الجلدية، التسمم بالمعادن الثقيلة كالنيكل والرصاص، الالتهابات التلامسية).",
-      "استخدام تطبيقات ونماذج الذكاء الاصطناعي لفحص وتحليل مكملات الملابس والتأكد من أمانها الصحي.",
-      "اكتساب مهارة المفاضلة الذكية بين البدائل الصحية الآمنة والمكملات ذات التأثيرات السلبية."
+      "التعرف على معايير الاختيار السليم لمكملات الملابس",
+      "تحديد البدائل الصحية الآمنة باستخدام تطبيقات الذكاء الاصطناعي"
     ],
-    "robotInstructions": "مرحباً بكِ! أنا مساعدكِ الذكي لمكملات الملابس الصحية. سأرافقكِ خطوة بخطوة للتعرف على الخامات الآمنة، وكيف يساعدنا الذكاء الاصطناعي في حماية بشرتنا من الحساسية والمواد الضارة.",
-    "videoUrl": "https://www.youtube.com/embed/y53kwdqTLNU",
-    "webUrl": "https://ar.wikipedia.org/wiki/%D8%A5%D9%83%D8%B3%D8%B3%D9%88%D8%A7%D8%B1%D8%A7%D8%AA",
     "content": [
-      {
-        "id": "web",
-        "type": "web",
-        "title": "صفحة تفاعلية: الدليل الصحي لمكملات الملابس",
-        "color": "text-blue-600",
-        "url": "https://ar.wikipedia.org/wiki/%D8%A5%D9%83%D8%B3%D8%B3%D9%88%D8%A7%D8%B1%D8%A7%D8%AA"
-      },
       {
         "id": "video",
         "type": "video",
-        "title": "فيديو تعليمي: الذكاء الاصطناعي والوعي الصحي بمكملات الملابس",
-        "color": "text-purple-600",
-        "url": "https://www.youtube.com/embed/y53kwdqTLNU"
-      },
-      {
-        "id": "pdf",
-        "type": "pdf",
-        "title": "دليل إرشادي: المعايير الصحية لاختيار مكملات الملابس",
-        "color": "text-red-600",
-        "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
-      },
-      {
-        "id": "ppt",
-        "type": "ppt",
-        "title": "عرض تقديمي: تصنيف مكملات الملابس وبدائلها الآمنة",
-        "color": "text-orange-600",
-        "url": "https://view.officeapps.live.com/op/view.aspx?src=https://filesamples.com/samples/document/pptx/sample1.pptx"
-      },
-      {
-        "id": "word",
-        "type": "word",
-        "title": "ورقة عمل: بطاقة الفحص الصحي لمكملات الملابس",
-        "color": "text-blue-500",
-        "url": "https://filesamples.com/samples/document/docx/sample1.docx"
-      },
-      {
-        "id": "audio",
-        "type": "audio",
-        "title": "تسجيل صوتي: إرشادات الأمان الصحي والوقاية من حساسية النيكل",
-        "color": "text-emerald-600",
-        "url": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+        "title": "فيديو تعليمي",
+        "icon": "Video",
+        "color": "text-purple-500",
+        "url": "https://www.youtube.com/embed/idvYvqBRCoc"
       }
     ],
     "activities": [
       {
-        "id": "act_ai_analyzer",
-        "title": "نشاط تفاعلي (1): فحص وتحليل مكمل الملابس بالذكاء الاصطناعي",
+        "id": "act_1792229795473",
+        "title": "نشاط تفاعلي: فحص مكمل الملابس بالذكاء الاصطناعي",
         "type": "individual",
-        "description": "استخدمي أداة الفحص الذكي التفاعلية لتحليل مكمل ملابس (أزرار، سحّابات، حلي معدنية، أحزمة، إكسسوارات قماشية)، وتحديد نسبة الأمان الصحي والمخاطر المحتملة (مثل حساسية النيكل وتهيج الجلد التماسي)، والحصول على تقرير وتوصيات صحية فورية.",
-        "interactiveType": "ai_accessory_analyzer",
-        "imageUrl": "https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&q=80&w=600",
-        "questions": [
-          "ما نوع مكمل الملابس المراد تحليله؟ (مثال: أزرار معدنية، حلي مقلدة، حزام جلد بإبزيم معدني)",
-          "ما هي الخامة المصنوع منها المكمل وفقاً لتقديرك؟",
-          "هل يلامس المكمل الجلد مباشرة؟ وما هي المخاطر الصحية المحتملة؟"
-        ]
+        "description": "استخدمي أداة التحليل الذكي لفحص مكمل الملابس وتحديد معايير الأمان الصحي والبدائل الآمنة.",
+        "interactiveType": "ai_accessory_analyzer"
       },
       {
-        "id": "act_ai_consultant",
-        "title": "نشاط تفاعلي (2): المستشار الصحي الذكي لمكملات الملابس",
-        "type": "group",
-        "description": "محاكاة تفاعلية ذكية: اختبري موقفاً واقعياً مع المستشار الذكي لاقتراح مكملات ملابس ملائمة لحالة صحية محددة (مثل: مريضة حساسية جلدية مفرطة، أو ملابس أطفال وحديثي ولادة)، وقارني مقترحات الذكاء الاصطناعي مع زميلاتك.",
-        "interactiveType": "ai_health_advisor",
-        "imageUrl": "https://images.unsplash.com/photo-1535223289827-42f1e9919769?auto=format&fit=crop&q=80&w=600",
-        "questions": [
-          "ما هي المشكلة الصحية المحددة في الحالة؟",
-          "ما هي التوصية التي قدمها لكِ المساعد الذكي لتفادي الحساسية؟",
-          "ما هو البديل الصحي الآمن الذي تقترحينه لاستبدال المكمل الضار؟"
-        ]
-      },
-      {
-        "id": "act_ai_scenario",
-        "title": "نشاط تفاعلي (3): مصمم البدائل الصحية الآمنة والمستدامة",
-        "type": "individual",
-        "description": "توظيف تقنيات الذكاء الاصطناعي في إعادة تصميم وتجهيز مكملات ملابس آمنة وصديقة للبيئة (خشب طبيعي، فولاذ جراحي، خيوط طبيعية 100%)، وتقديم مخطط البديل الصحي للمقرر.",
-        "interactiveType": "ai_safe_selector",
-        "imageUrl": "https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&q=80&w=600",
-        "questions": [
-          "حددي المكمل غير الصحي والمادة الضارة التي يحتوي عليها.",
-          "اذكري البديل الآمن المعتمد صحياً وخامات تصنيعه.",
-          "كيف يسهم هذا البديل في الحفاظ على صحة المستهلك والبيئة؟"
-        ]
+        "id": "1792267651544",
+        "title": "",
+        "description": "",
+        "type": "individual"
       }
     ],
     "evaluation": [
       {
-        "id": "q1",
-        "question": "ما هو المعدن الأكثر شيوعاً في إكسسوارات ومكملات الملابس الذي يسبب حساسية التلامس الجلدية (Contact Dermatitis)؟",
+        "id": "1792267675777",
+        "type": "mcq",
+        "question": " اي من المكملات الاتيه يعتبر مكمل متصل :",
         "options": [
           {
             "id": "a",
-            "text": "النيكل (Nickel)"
+            "text": "الحذاء "
           },
           {
             "id": "b",
-            "text": "الفضة الإسترلينية النقية"
+            "text": "حقيبة اليد "
           },
           {
             "id": "c",
-            "text": "التيتانيوم الطبي"
-          },
-          {
-            "id": "d",
-            "text": "الفولاذ الجراحي المقاوم للصدأ"
+            "text": "التطريز"
           }
         ],
-        "correctId": "a"
+        "correctId": "c"
       },
       {
-        "id": "q2",
-        "question": "كيف تسهم تطبيقات الذكاء الاصطناعي بصورة فعالة في تنمية الوعي الصحي بمكملات الملابس؟",
+        "id": "1792267768359",
+        "type": "mcq",
+        "question": "تعتبر الشرائط والدانتيل من المكملات ",
         "options": [
           {
             "id": "a",
-            "text": "بتحليل مواصفات الخامات والتعرف على المواد المهيجة واقتراح بدائل صحية آمنة"
+            "text": "المتصلة "
           },
           {
             "id": "b",
-            "text": "بتغيير ألوان صور الملابس على مواقع التواصل الاجتماعي فقط"
+            "text": "الوظيفية "
           },
           {
             "id": "c",
-            "text": "بتخفيض تكلفة الشراء دون فحص جودة المكونات"
-          },
-          {
-            "id": "d",
-            "text": "بزيادة استهلاك المواد البلاستيكية سريعة التلف"
+            "text": "المنفصلة "
           }
         ],
-        "correctId": "a"
+        "correctId": "b"
       },
       {
-        "id": "q3",
-        "question": "أي من الخامات التالية تُعد الخيار الأكثر أماناً وصحة لمكملات ملابس الأطفال والرضع؟",
+        "id": "1792267809370",
+        "type": "mcq",
+        "question": "المكملات الاساسية هي التي تعمل علي اضافة قيمة",
         "options": [
           {
             "id": "a",
-            "text": "الأخشاب الطبيعية المعالجة بزيوت آمنة والسيليكون الغذائي الخالي من BPA"
+            "text": "جمالية "
           },
           {
             "id": "b",
-            "text": "المعادن الرخيصة المطلية بالنيكل اللامع"
+            "text": "نفعية "
           },
           {
             "id": "c",
-            "text": "البلاستيك المعاد تدويره مجهول التركيب الكيميائي"
-          },
-          {
-            "id": "d",
-            "text": "الخرز الزجاجي الحاد الأطراف وغير الثابت"
+            "text": "جمالية ونفعية معاً"
           }
         ],
-        "correctId": "a"
-      },
-      {
-        "id": "q4",
-        "question": "أصيبت طالبة باحمرار وحكة بعد ارتداء حزام يحتوي على إبزيم معدني ملامس للجلد. ما الإجراء الصحي السليم؟",
-        "options": [
-          {
-            "id": "a",
-            "text": "التوقف فوراً عن ارتدائه واستبداله بإبزيم خالي من النيكل أو عزله بطبقة واقية"
-          },
-          {
-            "id": "b",
-            "text": "رش الإبزيم بالعطور لتقليل الاحتكاك"
-          },
-          {
-            "id": "c",
-            "text": "الاستمرار في ارتدائه حتى يتعود الجلد عليه"
-          },
-          {
-            "id": "d",
-            "text": "غسل الإبزيم بالماء الساخن فقط دون تبديله"
-          }
-        ],
-        "correctId": "a"
-      },
-      {
-        "id": "q5",
-        "question": "ما المعيار الصحي الأساسي عند اختيار مكملات الملابس الملامسة للبشرة مباشرة لفترات طويلة؟",
-        "options": [
-          {
-            "id": "a",
-            "text": "خلوها من المعادن الثقيلة السامة والصبغات المسرطنة وتوافقها الحيوي مع الجلد"
-          },
-          {
-            "id": "b",
-            "text": "أن تكون ثقيلة الوزن لضمان ثباتها على الجسم"
-          },
-          {
-            "id": "c",
-            "text": "أن تكون براقة ومطلية بالكروم التجاري غير المعالج"
-          },
-          {
-            "id": "d",
-            "text": "أن تحتوي على نسبة من الرصاص لزيادة صلابتها"
-          }
-        ],
-        "correctId": "a"
-      },
-      {
-        "id": "q6",
-        "question": "هل جميع الخامات الطبيعية المستخدمة في مكملات الملابس خالية تماماً من التسبب بالحساسية؟",
-        "options": [
-          {
-            "id": "a",
-            "text": "خطأ، بعض المواد الطبيعية كالمطاط الطبيعي (اللاتكس) والجلود المدبوغة قد تسبب حساسية لدى البعض"
-          },
-          {
-            "id": "b",
-            "text": "صح، كل خامة طبيعية لا يمكن أن تحدث أي تهيج جلدي تحت أي ظرف"
-          }
-        ],
-        "correctId": "a"
+        "correctId": "c"
       }
     ],
     "status": "published",
-    "createdAt": "2026-10-16T18:30:00.000Z"
+    "id": "session_1792229795568_f3lyh",
+    "createdAt": "2026-10-17T20:11:32.061Z",
+    "wordUrl": "",
+    "pptUrl": "",
+    "pdfUrl": "",
+    "audioUrl": "",
+    "generalObjective": "",
+    "updatedAt": "2026-10-17T20:11:32.056Z"
   },
   {
     "courseId": "course_1792174732543_4i1dv",
-    "title": "الدرس 1",
-    "lessonNumber": 1,
-    "description": "محتوى الدرس 1",
+    "title": "مكملات الملابس والمظهر العام",
+    "lessonNumber": 2,
+    "description": "محتوى الدرس 2",
+    "webUrl": "",
+    "videoUrl": "https://www.youtube.com/embed/y53kwdqTLNU",
+    "code": "",
+    "robotInstructions": "",
+    "objectives": [
+      "1)\tان تدرك الطالبة تأثير مكملات الملابس في تحسين المظهر العام.",
+      "2)\tان تدرك الطالبة العلاقة بين اختيار مكملات الملابس والمظهرالشخصي.",
+      "3)\tان تذكر الطالبة أهمية مكملات الملابس."
+    ],
+    "content": [
+      {
+        "id": "video",
+        "type": "video",
+        "title": "فيديو تعليمي",
+        "icon": "Video",
+        "color": "text-purple-500",
+        "url": "https://www.youtube.com/embed/y53kwdqTLNU"
+      }
+    ],
+    "activities": [
+      {
+        "id": "act_1792269251823",
+        "title": "نشاط تفاعلي: فحص مكمل الملابس بالذكاء الاصطناعي",
+        "type": "individual",
+        "description": "جمع صور ونماذج من مكملات الملابس من المجلات او الانترنت (حقائب – أحذية – حُلي – أوشحة – قبعات).",
+        "interactiveType": "ai_accessory_analyzer"
+      }
+    ],
+    "evaluation": [
+      {
+        "id": 1792269348481,
+        "question": "1)\tتؤثر مكملات الملابس على المظهر العام",
+        "options": [
+          {
+            "id": "a",
+            "text": "اجابة صحيحة "
+          },
+          {
+            "id": "b",
+            "text": "اجابة خطا "
+          },
+          {
+            "id": "c",
+            "text": ""
+          }
+        ],
+        "correctId": "b"
+      }
+    ],
+    "status": "published",
+    "id": "session_1792269251826_tetl1",
+    "createdAt": "2026-10-17T20:34:11.826Z",
+    "generalObjective": "",
+    "wordUrl": "",
+    "pptUrl": "",
+    "pdfUrl": "",
+    "audioUrl": "",
+    "updatedAt": {
+      "_methodName": "serverTimestamp"
+    }
+  },
+  {
+    "courseId": "course_1792174732543_4i1dv",
+    "title": "التقسيم النوعي لمكملات الملابس ودوافع الافراد نحو استخدامها",
+    "lessonNumber": 3,
+    "description": "محتوى الدرس 3",
+    "webUrl": "\tالتقسيم النوعي للمكملات وتصنيفها تبعاً لوقت استخدامها: ",
+    "videoUrl": "https://www.youtube.com/embed/y53kwdqTLNU",
+    "code": "",
+    "robotInstructions": "",
+    "objectives": [
+      "ان توضح الطالبة التقسيم النوعي لمكملات الملابس وفقًا لوظائفها واستخداماتها المختلفة.",
+      "ان تصنف الطالبة أنواع مكملات الملابس من حيث الشكل والخامة والاستخدام.",
+      "ان تدرك الطالبة الفرق بين  دوافع الافراد نحو استخدام مكملات الملابس. "
+    ],
+    "content": [
+      {
+        "id": "web",
+        "type": "web",
+        "title": "صفحة ويب",
+        "icon": "Globe",
+        "color": "text-blue-600",
+        "url": "\tالتقسيم النوعي للمكملات وتصنيفها تبعاً لوقت استخدامها: "
+      },
+      {
+        "id": "video",
+        "type": "video",
+        "title": "فيديو تعليمي",
+        "icon": "Video",
+        "color": "text-purple-500",
+        "url": "https://www.youtube.com/embed/y53kwdqTLNU"
+      }
+    ],
+    "activities": [
+      {
+        "id": "act_1792269993143",
+        "title": "مناقشة جماعية لاختيار أنسب المكمّلات لمناسبات مختلفة (مدرسة، عرس، نزهة...)",
+        "type": "individual",
+        "description": "استخدمي أداة التحليل الذكي لفحص مكمل الملابس وتحديد معايير الأمان الصحي والبدائل الآمنة.",
+        "interactiveType": "ai_accessory_analyzer"
+      }
+    ],
+    "evaluation": [
+      {
+        "id": 1792270064359,
+        "question": "1)\tالمكملات التي تتميز بكبر حجم الحقائب والاحذية المريحة هي المكملات الخاصة: ",
+        "options": [
+          {
+            "id": "a",
+            "text": "بالمناسبات "
+          },
+          {
+            "id": "b",
+            "text": "بفترة الصباح "
+          },
+          {
+            "id": "c",
+            "text": "بفترة المساء والسهرة "
+          }
+        ],
+        "correctId": "b"
+      },
+      {
+        "id": 1792270086094,
+        "question": "2)\tمن الخصائص التي تتميز بها المكملات الخاصة بفتره المساء والسهرة ",
+        "options": [
+          {
+            "id": "a",
+            "text": "انيقة لامعة"
+          },
+          {
+            "id": "b",
+            "text": "اكثر جاذبية"
+          },
+          {
+            "id": "c",
+            "text": "جميع ما سبق)"
+          }
+        ],
+        "correctId": "b"
+      },
+      {
+        "id": 1792270119271,
+        "question": "\tارتداء قفازات في الشتاء للدفء والحماية من الدوافع",
+        "options": [
+          {
+            "id": "a",
+            "text": "الوظيفية "
+          },
+          {
+            "id": "b",
+            "text": "الاقتصادية"
+          },
+          {
+            "id": "c",
+            "text": "الاجتماعية"
+          }
+        ],
+        "correctId": "c"
+      }
+    ],
+    "status": "published",
+    "id": "session_1792269993159_mg23l",
+    "createdAt": "2026-10-17T20:46:33.159Z",
+    "generalObjective": "",
+    "wordUrl": "",
+    "pptUrl": "",
+    "pdfUrl": "",
+    "audioUrl": "",
+    "updatedAt": {
+      "_methodName": "serverTimestamp"
+    }
+  },
+  {
+    "courseId": "course_1792174732543_4i1dv",
+    "title": "اسس الاختيار الصحيح لمكملات الملابس (جمالياً ووظيفياً)",
+    "lessonNumber": 4,
+    "description": "محتوى الدرس 4",
+    "webUrl": "",
+    "videoUrl": "https://www.youtube.com/embed/y53kwdqTLNU",
+    "code": "",
+    "robotInstructions": "",
+    "objectives": [
+      "1)\tان تقارن الطالبة بين الأسس الصحية والجمالية لاختيار مكملات الملابس.",
+      "2)\tان تحقيق الطالبة التوازن بين الجانب الجمالي والسلامة الصحية.",
+      "3)\tان تدعم الطالبة الاتجاهات الإيجابية نحو الاختيار الواعي لمكملات الملابس بما يتوافق مع المحافظة علي معاييرالصحة والمظهر العام."
+    ],
+    "content": [
+      {
+        "id": "video",
+        "type": "video",
+        "title": "فيديو تعليمي",
+        "icon": "Video",
+        "color": "text-purple-500",
+        "url": "https://www.youtube.com/embed/y53kwdqTLNU"
+      }
+    ],
+    "activities": [
+      {
+        "id": "act_1792270219527",
+        "title": "نشاط تفاعلي: فحص مكمل الملابس بالذكاء الاصطناعي",
+        "type": "individual",
+        "description": "استخدمي أداة التحليل الذكي لفحص مكمل الملابس وتحديد معايير الأمان الصحي والبدائل الآمنة.",
+        "interactiveType": "ai_accessory_analyzer"
+      }
+    ],
+    "evaluation": [],
+    "status": "published",
+    "id": "session_1792270219529_3rbto",
+    "createdAt": "2026-10-17T20:50:19.529Z",
+    "generalObjective": "",
+    "wordUrl": "",
+    "pptUrl": "",
+    "pdfUrl": "",
+    "audioUrl": "",
+    "updatedAt": {
+      "_methodName": "serverTimestamp"
+    }
+  },
+  {
+    "courseId": "course_1792174732543_4i1dv",
+    "title": "اسس الاختيار الصحيح لمكملات الملابس (صحياً)",
+    "lessonNumber": 5,
+    "description": "محتوى الدرس 5",
+    "webUrl": "",
+    "videoUrl": "https://www.youtube.com/embed/y53kwdqTLNU",
+    "code": "",
+    "robotInstructions": "",
+    "objectives": [
+      "1)\tان تدرك مفهوم الاختيار الصحي لمكملات الملابس",
+      "2)\tان تلخص الطالبة اهم الاسس لاختيار مكملات الملابس من الناحية الصحية.",
+      "3)\tان تدرك الطالبة الاضرارالصحية الناتجة عن الاختيار الخاطئ لمكملات الملابس."
+    ],
+    "content": [
+      {
+        "id": "video",
+        "type": "video",
+        "title": "فيديو تعليمي",
+        "icon": "Video",
+        "color": "text-purple-500",
+        "url": "https://www.youtube.com/embed/y53kwdqTLNU"
+      }
+    ],
+    "activities": [
+      {
+        "id": "act_1792270244342",
+        "title": "نشاط تفاعلي: فحص مكمل الملابس بالذكاء الاصطناعي",
+        "type": "individual",
+        "description": "استخدمي أداة التحليل الذكي لفحص مكمل الملابس وتحديد معايير الأمان الصحي والبدائل الآمنة.",
+        "interactiveType": "ai_accessory_analyzer"
+      }
+    ],
+    "evaluation": [],
+    "status": "published",
+    "id": "session_1792270244344_eaevw",
+    "createdAt": "2026-10-17T20:50:44.344Z",
+    "generalObjective": "",
+    "wordUrl": "",
+    "pptUrl": "",
+    "pdfUrl": "",
+    "audioUrl": "",
+    "updatedAt": {
+      "_methodName": "serverTimestamp"
+    }
+  },
+  {
+    "courseId": "course_1792174732543_4i1dv",
+    "title": "الاختيار الصحيح لحذاء القدم واضرار عدم الملاءمة",
+    "lessonNumber": 6,
+    "description": "محتوى الدرس 6",
     "webUrl": "",
     "videoUrl": "https://www.youtube.com/embed/y53kwdqTLNU",
     "code": "",
@@ -250,28 +394,17 @@
     ],
     "content": [
       {
-        "id": "web",
-        "type": "web",
-        "title": "صفحة ويب",
-        "color": "text-blue-600"
-      },
-      {
         "id": "video",
         "type": "video",
         "title": "فيديو تعليمي",
+        "icon": "Video",
         "color": "text-purple-500",
         "url": "https://www.youtube.com/embed/y53kwdqTLNU"
-      },
-      {
-        "id": "pdf",
-        "type": "pdf",
-        "title": "ملف PDF",
-        "color": "text-red-500"
       }
     ],
     "activities": [
       {
-        "id": "act_1792229795473",
+        "id": "act_1792270460599",
         "title": "نشاط تفاعلي: فحص مكمل الملابس بالذكاء الاصطناعي",
         "type": "individual",
         "description": "استخدمي أداة التحليل الذكي لفحص مكمل الملابس وتحديد معايير الأمان الصحي والبدائل الآمنة.",
@@ -280,7 +413,95 @@
     ],
     "evaluation": [],
     "status": "published",
-    "id": "session_1792229795568_f3lyh",
-    "createdAt": "2026-10-17T09:36:35.568Z"
+    "id": "session_1792270460601_87de7",
+    "createdAt": "2026-10-17T20:54:20.601Z",
+    "generalObjective": "",
+    "wordUrl": "",
+    "pptUrl": "",
+    "pdfUrl": "",
+    "audioUrl": "",
+    "updatedAt": {
+      "_methodName": "serverTimestamp"
+    }
+  },
+  {
+    "title": "الاختيار الصحيح  لحقيبة اليد واضرار عدم الملاءمة",
+    "webUrl": "",
+    "videoUrl": "https://www.youtube.com/embed/y53kwdqTLNU",
+    "wordUrl": "",
+    "pptUrl": "",
+    "pdfUrl": "",
+    "audioUrl": "",
+    "code": "",
+    "generalObjective": "",
+    "objectives": [
+      "التعرف على معايير الاختيار السليم لمكملات الملابس",
+      "تحديد البدائل الصحية الآمنة باستخدام تطبيقات الذكاء الاصطناعي"
+    ],
+    "activities": [
+      {
+        "id": "act_1792270460599",
+        "title": "نشاط تفاعلي: فحص مكمل الملابس بالذكاء الاصطناعي",
+        "type": "individual",
+        "description": "استخدمي أداة التحليل الذكي لفحص مكمل الملابس وتحديد معايير الأمان الصحي والبدائل الآمنة.",
+        "interactiveType": "ai_accessory_analyzer"
+      }
+    ],
+    "evaluation": [],
+    "updatedAt": "2026-10-17T20:55:33.943Z",
+    "content": [
+      {
+        "id": "video",
+        "type": "video",
+        "title": "فيديو تعليمي",
+        "icon": "Video",
+        "color": "text-purple-500",
+        "url": "https://www.youtube.com/embed/y53kwdqTLNU"
+      }
+    ],
+    "id": "F4rNCfrmlWjvadQSeIHt",
+    "courseId": "course_1792174732543_4i1dv",
+    "createdAt": "2026-10-17T20:55:33.946Z"
+  },
+  {
+    "title": "الاختيار الصحيح لنظارات العين وأضرار عدم الملاءمة",
+    "webUrl": "",
+    "videoUrl": "https://www.youtube.com/embed/y53kwdqTLNU",
+    "wordUrl": "",
+    "pptUrl": "",
+    "pdfUrl": "",
+    "audioUrl": "",
+    "code": "",
+    "generalObjective": "",
+    "objectives": [
+      "ان تعدد الطالبة انواع نظارات العين .",
+      "ان تدرك الطالبة أهمية الاختيار الصحيح لنظارات العين للحفاظ على صحة العين.",
+      "ان تعدد الطالبة الأضرار الصحية الناتجة عن عدم ملاءمة نظارات العين.",
+      "ان تكتسب الطالبة سلوكيات صحيحة للوقاية والعناية بنظارات العين واستخدامها بطريقة آمنة في الحياة اليومية."
+    ],
+    "activities": [
+      {
+        "id": "act_1792270460599",
+        "title": "نشاط تفاعلي: فحص مكمل الملابس بالذكاء الاصطناعي",
+        "type": "individual",
+        "description": "استخدمي أداة التحليل الذكي لفحص مكمل الملابس وتحديد معايير الأمان الصحي والبدائل الآمنة.",
+        "interactiveType": "ai_accessory_analyzer"
+      }
+    ],
+    "evaluation": [],
+    "updatedAt": "2026-10-17T20:57:28.110Z",
+    "content": [
+      {
+        "id": "video",
+        "type": "video",
+        "title": "فيديو تعليمي",
+        "icon": "Video",
+        "color": "text-purple-500",
+        "url": "https://www.youtube.com/embed/y53kwdqTLNU"
+      }
+    ],
+    "id": "w0J0V8kYYLTwfbREiEqp",
+    "courseId": "course_1792174732543_4i1dv",
+    "createdAt": "2026-10-17T20:57:28.114Z"
   }
 ]

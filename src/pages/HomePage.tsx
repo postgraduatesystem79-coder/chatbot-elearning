@@ -37,10 +37,10 @@ export function HomePage() {
     <div className="space-y-12 pb-20 overflow-hidden">
       {/* Hero Section */}
       {/* Banner / Hero Section */}
-      <section className="relative pt-12 pb-24 px-6">
+      <section className="relative isolate rounded-3xl pt-12 pb-24 px-6">
         {/* Modern Curved Background */}
-        <div className="absolute inset-0 overflow-hidden -z-10">
-          <div className="absolute top-0 left-0 w-full h-[120%] bg-gradient-to-br from-[#064e40] via-[#086b58] to-[#04332a] [clip-path:ellipse(150%_100%_at_50%_0%)]" />
+        <div className="absolute inset-0 overflow-hidden rounded-3xl -z-10">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 via-white to-orange-50 dark:from-[#064e40] dark:via-[#086b58] dark:to-[#04332a]" />
           <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/10 blur-[120px] rounded-full -mr-48 -mt-48 animate-pulse" />
         </div>
 
@@ -48,7 +48,7 @@ export function HomePage() {
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md text-orange-200 border border-white/10 font-bold text-xs mb-8 uppercase tracking-widest shadow-2xl"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/90 text-emerald-900 border border-emerald-200 dark:bg-white/10 dark:text-orange-200 dark:border-white/20 font-bold text-xs mb-8 uppercase tracking-widest shadow-sm"
           >
             <Sparkles size={14} className="animate-pulse" />
             <span>بيئة تعليمية ذكية متطورة</span>
@@ -57,17 +57,17 @@ export function HomePage() {
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl md:text-7xl font-black text-white mb-8 leading-[1.1] tracking-tight"
+            className="text-4xl md:text-7xl font-black text-emerald-950 dark:text-white mb-8 leading-[1.1] tracking-tight"
           >
             بيئة التعلم الإلكترونية <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-200">وتطبيقات الذكاء الاصطناعي</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-700 to-amber-700 dark:from-orange-400 dark:to-amber-200">وتطبيقات الذكاء الاصطناعي</span>
           </motion.h1>
           
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-lg md:text-xl text-white/70 font-medium max-w-3xl mx-auto leading-relaxed mb-12"
+            className="text-lg md:text-xl text-slate-700 dark:text-white/80 font-medium max-w-3xl mx-auto leading-relaxed mb-12"
           >
             {t('home_welcome_subtitle') || 'بيئة رقمية متطورة تهدف لتنمية الوعي الصحي لاختيار مكملات الملابس باستخدام تطبيقات الذكاء الاصطناعي.'}
           </motion.p>
@@ -80,7 +80,7 @@ export function HomePage() {
           >
             <Link 
               to="/courses" 
-              className="group relative px-12 py-5 bg-[#fc721e] hover:bg-[#e65a10] text-white rounded-2xl font-black flex items-center gap-3 transition-all transform hover:scale-105 shadow-[0_20px_50px_rgba(252,114,30,0.3)]"
+              className="group relative px-12 py-5 bg-orange-700 hover:bg-orange-800 dark:bg-[#fc721e] dark:hover:bg-[#e65a10] text-white rounded-2xl font-black flex items-center gap-3 transition-all transform hover:scale-105 shadow-lg shadow-orange-700/20"
             >
               <div className="absolute inset-0 bg-white/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
               <span className="text-lg">ابدئي التعلم الآن</span>
@@ -89,7 +89,7 @@ export function HomePage() {
             
             <Link 
               to="/instructions" 
-              className="px-12 py-5 bg-white/5 hover:bg-white/10 text-white border border-white/20 backdrop-blur-xl rounded-2xl font-bold transition-all flex items-center gap-2"
+              className="px-12 py-5 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 dark:bg-white/5 dark:hover:bg-white/10 dark:text-white dark:border-white/30 backdrop-blur-xl rounded-2xl font-bold transition-all flex items-center gap-2"
             >
               <Layout size={20} />
               <span>تعليمات الاستخدام</span>
@@ -160,13 +160,6 @@ export function HomePage() {
           </div>
         </motion.div>
       </motion.div>
-
-      {/* Decorative Wave Transition */}
-      <div className="relative h-24 -mt-12 overflow-hidden pointer-events-none">
-         <svg viewBox="0 0 1440 320" className="absolute bottom-0 w-full h-full text-[#064e40] fill-current">
-            <path d="M0,160L48,176C96,192,192,224,288,213.3C384,203,480,149,576,149.3C672,149,768,203,864,197.3C960,192,1056,128,1152,112C1248,96,1344,128,1392,144L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
-         </svg>
-      </div>
 
       {/* Features Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

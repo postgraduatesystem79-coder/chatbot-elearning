@@ -134,9 +134,10 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Firebase init (client SDK)
 const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+let firebaseConfig: { projectId?: string; storageBucket?: string } = {};
 if (fs.existsSync(firebaseConfigPath)) {
   try {
-    const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
+    firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
     initializeApp(firebaseConfig);
   } catch (e) {
     console.warn("[Firebase] Could not initialize client SDK:", e);
@@ -195,6 +196,11 @@ if (fs.existsSync(firebaseConfigPath)) {
   if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
   const COURSES_FILE = path.join(DB_DIR, "courses.json");
   const SESSIONS_FILE = path.join(DB_DIR, "sessions.json");
+  const DELETED_SESSIONS_FILE = path.join(DB_DIR, "deleted_sessions.json");
+  function readDeletedSessionIds(): string[] {
+    if (!fs.existsSync(DELETED_SESSIONS_FILE)) return [];
+    return JSON.parse(fs.readFileSync(DELETED_SESSIONS_FILE, "utf-8"));
+  }
 
   function readLocalCourses(): any[] {
     if (!fs.existsSync(COURSES_FILE)) return [];
@@ -208,7 +214,7 @@ if (fs.existsSync(firebaseConfigPath)) {
     try { return JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf-8")); } catch { return []; }
   }
   function saveLocalSessions(data: any[]) {
-    try { fs.writeFileSync(SESSIONS_FILE, JSON.stringify(data, null, 2), "utf-8"); } catch (e) { console.error(e); }
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(data, null, 2), "utf-8");
   }
 
   // ===================== Courses & Lessons Endpoints =====================
@@ -262,24 +268,22 @@ if (fs.existsSync(firebaseConfigPath)) {
 
   app.get("/api/sessions", async (req, res) => {
     try {
+      const deletedIds = readDeletedSessionIds();
       const courseId = req.query.courseId as string;
       if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
         try {
           let ref: any = admin.firestore().collection("sessions");
           if (courseId) ref = ref.where("courseId", "==", courseId);
           const snapshot = await ref.get();
-          const items = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-          if (items.length > 0) return res.json({ success: true, sessions: items });
+          const items = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })).filter((item: any) => !deletedIds.includes(item.id));
+          if (items.length > 0) return res.json({ success: true, sessions: items, deletedIds });
         } catch (e) {
           console.warn("[API] Firestore sessions get failed, falling back to local file:", e);
         }
       }
       const list = readLocalSessions();
-      let filtered = courseId ? list.filter(s => s.courseId === courseId) : list;
-      if (courseId && filtered.length === 0 && list.length > 0) {
-        filtered = list;
-      }
-      res.json({ success: true, sessions: filtered });
+      const filtered = list.filter(s => !deletedIds.includes(s.id) && (!courseId || s.courseId === courseId));
+      res.json({ success: true, sessions: filtered, deletedIds });
     } catch (e: any) {
       res.status(500).json({ success: false, error: e.message });
     }
@@ -319,6 +323,9 @@ if (fs.existsSync(firebaseConfigPath)) {
   app.get("/api/sessions/:id", async (req, res) => {
     try {
       const sessionId = req.params.id;
+      if (readDeletedSessionIds().includes(sessionId)) {
+        return res.status(404).json({ success: false, error: "Session not found" });
+      }
       if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
         try {
           const docSnap = await admin.firestore().collection("sessions").doc(sessionId).get();
@@ -358,16 +365,16 @@ if (fs.existsSync(firebaseConfigPath)) {
   app.delete("/api/sessions/:id", async (req, res) => {
     try {
       const sessionId = req.params.id;
-      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
-        try {
-          await admin.firestore().collection("sessions").doc(sessionId).delete();
-        } catch (e) {
-          console.warn("[API] Firestore session delete failed:", e);
-        }
+      const deletedIds = readDeletedSessionIds();
+      if (!deletedIds.includes(sessionId)) {
+        fs.writeFileSync(DELETED_SESSIONS_FILE, JSON.stringify([...deletedIds, sessionId]), "utf-8");
       }
-      const list = readLocalSessions();
-      const updated = list.filter(s => s.id !== sessionId);
-      saveLocalSessions(updated);
+      saveLocalSessions(readLocalSessions().filter(s => s.id !== sessionId));
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        void admin.firestore().collection("sessions").doc(sessionId).delete().catch(e => {
+          console.warn("[API] Firestore session delete failed:", e);
+        });
+      }
       res.json({ success: true, message: "Session deleted successfully" });
     } catch (e: any) {
       res.status(500).json({ success: false, error: e.message });

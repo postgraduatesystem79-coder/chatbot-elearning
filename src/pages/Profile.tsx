@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../lib/useAuth';
 import { useTranslation } from 'react-i18next';
 import { User, Mail, Shield, Calendar, Award, Clock, BookOpen, BarChart3, Edit2, Check, X } from 'lucide-react';
@@ -9,21 +9,39 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 export function Profile() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState(profile?.displayName || '');
+  const uid = profile?.uid || user?.uid;
+  const displayName = profile?.displayName || profile?.name || user?.displayName || '';
+  const email = profile?.email || user?.email || 'غير متاح';
+  const academicId = profile?.academicId || (typeof uid === 'string' ? `#${uid.substring(0, 8).toUpperCase()}` : 'غير متاح');
+  const createdAt = profile?.createdAt;
+  const joinedDate = createdAt
+    ? typeof createdAt.toDate === 'function' ? createdAt.toDate()
+      : typeof createdAt.seconds === 'number' ? new Date(createdAt.seconds * 1000)
+      : typeof createdAt === 'string' || typeof createdAt === 'number' ? new Date(createdAt) : null
+    : null;
 
-  if (!profile) return null;
+  useEffect(() => {
+    if (!isEditing) setNewName(displayName);
+  }, [displayName, isEditing]);
+
+  if (!profile) return <div className="bg-card border rounded-xl p-8 text-center" role="status">جاري تحميل بيانات الملف الشخصي. إذا استمر الانتظار، حدّثي الصفحة أو سجّلي الدخول مجددًا.</div>;
 
   const handleSaveName = async () => {
+    if (!uid) {
+      toast.error('تعذر تحديد الحساب. يُرجى تسجيل الدخول مجددًا.');
+      return;
+    }
     if (!newName.trim()) {
       toast.error(t('name_required') || 'الاسم مطلوب');
       return;
     }
 
     try {
-      await updateDoc(doc(db, 'users', profile.uid), {
+      await updateDoc(doc(db, 'users', uid), {
         displayName: newName,
         name: newName // Update both fields for consistency
       });
@@ -54,7 +72,7 @@ export function Profile() {
           <div className="px-6 pb-6 -mt-12">
             <div className="flex flex-col items-center">
               <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-3xl font-bold border-4 border-card shadow-lg">
-                {profile.displayName?.[0]?.toUpperCase() || 'U'}
+                {displayName?.[0]?.toUpperCase() || 'U'}
               </div>
               
               <div className="mt-4 flex items-center gap-2 group">
@@ -70,13 +88,13 @@ export function Profile() {
                     <button onClick={handleSaveName} className="p-1 text-green-500 hover:bg-green-50 rounded">
                       <Check size={16} />
                     </button>
-                    <button onClick={() => { setIsEditing(false); setNewName(profile.displayName); }} className="p-1 text-red-500 hover:bg-red-50 rounded">
+                    <button onClick={() => { setIsEditing(false); setNewName(displayName); }} className="p-1 text-red-500 hover:bg-red-50 rounded">
                       <X size={16} />
                     </button>
                   </div>
                 ) : (
                   <>
-                    <h2 className="text-xl font-bold">{profile.displayName}</h2>
+                    <h2 className="text-xl font-bold">{displayName}</h2>
                     <button 
                       onClick={() => setIsEditing(true)}
                       className="p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-primary transition-all"
@@ -93,7 +111,7 @@ export function Profile() {
             <div className="mt-8 space-y-4">
               <div className="flex items-center gap-3 text-sm">
                 <Mail className="text-muted-foreground" size={18} />
-                <span className="truncate">{profile.email}</span>
+                <span className="truncate">{email}</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Shield className="text-muted-foreground" size={18} />
@@ -101,7 +119,7 @@ export function Profile() {
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <Calendar className="text-muted-foreground" size={18} />
-                <span>{t('joined') || 'Joined'}: {profile.createdAt?.toDate?.()?.toLocaleDateString() || 'N/A'}</span>
+                <span>{t('joined', { defaultValue: 'تاريخ الانضمام' })}: {joinedDate && !Number.isNaN(joinedDate.getTime()) ? joinedDate.toLocaleDateString() : 'غير متاح'}</span>
               </div>
             </div>
           </div>
@@ -139,7 +157,7 @@ export function Profile() {
           >
             <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
               <User className="text-primary" size={20} />
-              {t('personal_info') || 'Personal Information'}
+              {t('personal_info', { defaultValue: 'البيانات الشخصية' })}
             </h3>
             
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -154,14 +172,14 @@ export function Profile() {
                     className="bg-background border rounded-lg px-3 py-1.5 text-sm w-full outline-none ring-2 ring-primary/20"
                   />
                 ) : (
-                  <p className="font-bold text-lg">{profile.displayName}</p>
+                  <p className="font-bold text-lg">{displayName}</p>
                 )}
               </div>
             </div>
 
             <div className="space-y-1 p-4 bg-muted/20 rounded-2xl border border-border/50">
               <p className="text-[10px] font-black text-primary uppercase tracking-widest">{t('email')}</p>
-              <p className="font-bold">{profile.email}</p>
+              <p className="font-bold break-all">{email}</p>
             </div>
 
             <div className="space-y-1 p-4 bg-muted/20 rounded-2xl border border-border/50">
@@ -176,7 +194,7 @@ export function Profile() {
 
             <div className="space-y-1 p-4 bg-muted/20 rounded-2xl border border-border/50">
               <p className="text-[10px] font-black text-primary uppercase tracking-widest">{t('academic_id')}</p>
-              <p className="font-mono font-bold text-secondary">#{profile.uid.substring(0, 8).toUpperCase()}</p>
+              <p className="font-mono font-bold text-secondary">{academicId}</p>
             </div>
 
             <div className="space-y-1 p-4 bg-muted/20 rounded-2xl border border-border/50">

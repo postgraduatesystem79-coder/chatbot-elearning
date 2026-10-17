@@ -1,4 +1,4 @@
-import React, { useState, useEffect, FormEvent } from 'react';
+import React, { useState, useEffect, useRef, FormEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { collection, onSnapshot, query, where, addDoc, serverTimestamp, doc, getDoc, deleteDoc, setDoc, updateDoc } from 'firebase/firestore';
@@ -61,6 +61,7 @@ export function CourseLessons() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [lessonToDelete, setLessonToDelete] = useState<string | null>(null);
+  const deletedLessonIds = useRef(new Set<string>());
   const [editTab, setEditTab] = useState<'basic' | 'content' | 'activities' | 'evaluation' | 'robot'>('basic');
   const [editingSession, setEditingSession] = useState<any>({
     title: '',
@@ -124,6 +125,9 @@ export function CourseLessons() {
         body: JSON.stringify(newLesson)
       });
       const json = await res.json();
+      if (!res.ok || !json.success || !json.id) {
+        throw new Error(json.error || 'تعذر حفظ الدرس');
+      }
       if (json.success && json.id) {
         newDocId = json.id;
         const created = json.session || { ...newLesson, id: newDocId };
@@ -135,14 +139,14 @@ export function CourseLessons() {
       }
 
       // 2. Also try Firestore in background without awaiting
-      addDoc(collection(db, 'sessions'), { ...newLesson, createdAt: serverTimestamp() }).catch(() => {});
+      setDoc(doc(db, 'sessions', newDocId!), { ...newLesson, createdAt: serverTimestamp() }, { merge: true }).catch(() => {});
     } catch (err: any) {
       console.warn("Session add error:", err);
       toast.error(`تعذر إضافة الدرس: ${err.message || 'خطأ غير معروف'}`);
     } finally {
       setIsCreating(false);
       if (newDocId) {
-        navigate(`/courses/${id}/lessons/${newDocId}`);
+        navigate(`/courses/${id}/lessons/${newDocId}?edit=content`);
       }
     }
   };
@@ -155,15 +159,26 @@ export function CourseLessons() {
   };
 
   const confirmDeleteLesson = async () => {
-    if (!lessonToDelete) return;
+    if (!lessonToDelete || isSaving) return;
     setIsSaving(true);
     try {
-      await deleteDoc(doc(db, 'sessions', lessonToDelete));
+      const response = await fetch(`/api/sessions/${encodeURIComponent(lessonToDelete)}`, {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(15000)
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'تعذر حذف الدرس');
+      deletedLessonIds.current.add(lessonToDelete);
+      setLessons(previous => previous.filter(lesson => lesson.id !== lessonToDelete));
+      deleteDoc(doc(db, 'sessions', lessonToDelete)).catch(error => {
+        console.warn('Lesson cloud deletion pending:', error);
+      });
       toast.success('تم حذف الدرس بنجاح');
       setIsDeleteModalOpen(false);
       setLessonToDelete(null);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `sessions/${lessonToDelete}`);
+      console.error('Lesson deletion failed:', error);
+      toast.error('تعذر حذف الدرس. حاولي مرة أخرى وتأكدي من اتصال السيرفر.');
     } finally {
       setIsSaving(false);
     }
@@ -245,7 +260,7 @@ export function CourseLessons() {
         objectives: newObjectives,
         activities: editingSession.activities,
         evaluation: normalizeEvaluation(editingSession.evaluation),
-        updatedAt: serverTimestamp(),
+        updatedAt: new Date().toISOString(),
         content: [
           { id: 'web', type: 'web', title: 'صفحة ويب', icon: 'Globe', color: 'text-blue-600', url: editingSession.webUrl },
           { id: 'code', type: 'code', title: 'كود مدمج', icon: 'FileCode', color: 'text-slate-600', url: editingSession.code },
@@ -257,7 +272,15 @@ export function CourseLessons() {
         ].filter(item => item.url)
       };
 
-      await setDoc(doc(db, 'sessions', sessionId), updatedData, { merge: true });
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...updatedData, id: sessionId, courseId: id })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'تعذر حفظ الدرس');
+      setDoc(doc(db, 'sessions', sessionId), { ...updatedData, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+      setLessons(previous => previous.map(lesson => lesson.id === sessionId ? { ...lesson, ...updatedData } : lesson));
       toast.success('تم تحديث الدرس بنجاح');
       setIsEditModalOpen(false);
     } catch (error) {
@@ -269,6 +292,20 @@ export function CourseLessons() {
 
   useEffect(() => {
     if (!id) return;
+    let active = true;
+    let apiLessons: Lesson[] = [];
+    let liveLessons: Lesson[] = [];
+    const refreshLessons = () => {
+      if (!active) return;
+      const merged = new Map(apiLessons.map(lesson => [lesson.id, lesson]));
+      liveLessons.forEach(lesson => merged.set(lesson.id, lesson));
+      setLessons([...merged.values()]
+        .filter(lesson => !deletedLessonIds.current.has(lesson.id))
+        .sort((a, b) => (a.lessonNumber || 0) - (b.lessonNumber || 0)));
+    };
+    setLoading(true);
+    setCourse(null);
+    setLessons([]);
 
     // 1. Fetch course details from local API first
     fetch('/api/courses')
@@ -276,7 +313,7 @@ export function CourseLessons() {
       .then(json => {
         if (json.success && json.courses) {
           const found = json.courses.find((c: any) => c.id === id);
-          if (found) setCourse(found);
+          if (found && active) setCourse(found);
         }
       })
       .catch(() => {});
@@ -285,30 +322,19 @@ export function CourseLessons() {
     fetch(`/api/sessions?courseId=${id}`)
       .then(res => res.json())
       .then(json => {
-        if (json.success && json.sessions && json.sessions.length > 0) {
-          setLessons(json.sessions);
-          setLoading(false);
-        } else {
-          // Try fetching all sessions in case courseId matches loosely
-          fetch('/api/sessions')
-            .then(r => r.json())
-            .then(allJson => {
-              if (allJson.success && allJson.sessions && allJson.sessions.length > 0) {
-                const matched = allJson.sessions.filter((s: any) => s.courseId === id || !s.courseId);
-                if (matched.length > 0) {
-                  setLessons(matched);
-                  setLoading(false);
-                }
-              }
-            }).catch(() => {});
+        if (json.success && Array.isArray(json.sessions)) {
+          (json.deletedIds || []).forEach((lessonId: string) => deletedLessonIds.current.add(lessonId));
+          apiLessons = json.sessions.filter((lesson: Lesson) => lesson.courseId === id);
+          refreshLessons();
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false); });
 
     // 3. Firestore live sync (gracefully ignores offline errors)
     const courseRef = doc(db, 'courses', id);
     getDoc(courseRef).then(docSnap => {
-      if (docSnap.exists()) {
+      if (active && docSnap.exists()) {
         setCourse({ id: docSnap.id, ...docSnap.data() });
       }
     }).catch(error => {
@@ -320,17 +346,15 @@ export function CourseLessons() {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Lesson[];
-      if (data.length > 0) {
-        data.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
-        setLessons(data);
-      }
-      setLoading(false);
+      liveLessons = data;
+      refreshLessons();
+      if (active) setLoading(false);
     }, (error) => {
       console.warn("Firestore sessions list offline, using local API data:", error);
-      setLoading(false);
+      if (active) setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => { active = false; unsubscribe(); };
   }, [id]);
 
   if (loading) {

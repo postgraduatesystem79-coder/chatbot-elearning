@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { 
   Play, 
@@ -34,7 +34,8 @@ import {
   Image as ImageIcon,
   Globe,
   ExternalLink,
-  Upload
+  Upload,
+  Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
@@ -50,6 +51,7 @@ export function CourseDetail() {
   const { courseId, lessonId } = useParams();
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { profile, isTeacher, isAdmin } = useAuth();
 
   // Helper to get stats key (session-1, session-2, etc.)
@@ -73,9 +75,20 @@ export function CourseDetail() {
   const [editTab, setEditTab] = useState<'basic' | 'content' | 'activities' | 'evaluation'>('basic');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadedLessonId, setLoadedLessonId] = useState<string | null>(null);
   const [isVideoWatched, setIsVideoWatched] = useState(false);
   const [isWebRead, setIsWebRead] = useState(false);
   const [webUrl, setWebUrl] = useState('');
+
+  useEffect(() => {
+    if (isTeacher && loadedLessonId === lessonId && searchParams.get('edit') === 'content') {
+      setEditTab('content');
+      setIsEditModalOpen(true);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('edit');
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [isTeacher, loadedLessonId, lessonId, searchParams, setSearchParams]);
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -228,7 +241,7 @@ export function CourseDetail() {
         if (!isPrevCompleted) {
           setIsLocked(true);
           toast.error('يجب إكمال الدرس السابق أولاً');
-          navigate(`/courses/${courseId}/lessons`);
+          navigate(`/courses/${courseId}`);
         }
       }
     }, (error) => {
@@ -267,6 +280,7 @@ export function CourseDetail() {
             evaluation: normalizeEvaluation(data.evaluation || [])
           });
           setIsLoading(false);
+          setLoadedLessonId(sessionId);
         }
       })
       .catch(() => {});
@@ -275,6 +289,7 @@ export function CourseDetail() {
     const docRef = doc(db, 'sessions', sessionId);
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
+        setLoadedLessonId(sessionId);
         const data = docSnap.data() as any;
         setSessionData({
           ...data,
@@ -353,11 +368,15 @@ export function CourseDetail() {
       const sessionId = lessonId || 'session-1';
 
       // 1. Send to server API
-      await fetch('/api/sessions', {
+      const response = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: sessionId, ...updatedData })
       });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'تعذر حفظ الدرس');
+      }
 
       // 2. Also try Firestore in background
       setDoc(doc(db, 'sessions', sessionId), updatedData, { merge: true }).catch(() => {});
@@ -592,31 +611,25 @@ export function CourseDetail() {
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-12 relative">
       {/* AI Robot Learning Companion */}
-      <div className="fixed bottom-8 start-8 z-50 pointer-events-none md:pointer-events-auto">
+      <aside
+        aria-label="الروبوت التعليمي"
+        className="fixed bottom-28 left-4 md:bottom-28 md:left-6 z-30 pointer-events-none"
+      >
         <motion.div
            initial={{ opacity: 0, scale: 0.8, x: isAr ? 50 : -50 }}
            animate={{ opacity: 1, scale: 1, x: 0 }}
            className="relative"
         >
           {/* Speech Bubble */}
-          <div className={cn(
-            "absolute bottom-full mb-4 w-48 p-4 bg-primary text-primary-foreground text-xs font-bold rounded-2xl shadow-xl border-2 border-white/20 after:content-[''] after:absolute after:top-full after:border-8 after:border-transparent after:border-t-primary",
-            isAr ? "end-4 after:end-4" : "start-4 after:start-4"
-          )}>
+          <div className="absolute bottom-full left-0 mb-3 w-[min(16rem,calc(100vw-2rem))] p-4 bg-card text-card-foreground text-sm leading-relaxed font-bold rounded-2xl shadow-xl border border-border after:content-[''] after:absolute after:top-full after:left-6 after:border-8 after:border-transparent after:border-t-card">
+            <p className="text-primary text-xs mb-2">الروبوت التعليمي</p>
             {getRobotMessage()}
           </div>
           
           {/* Avatar Container */}
-          <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-2xl p-1 shadow-2xl border-4 border-white overflow-hidden flex items-center justify-center">
-             <div className="w-full h-full bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center">
-                <Cpu className="text-white animate-pulse" size={32} />
-             </div>
-             {/* Robot Face Visualization */}
-             <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex gap-2 mb-2">
-                   <div className="w-2 h-2 bg-white rounded-full animate-bounce" />
-                   <div className="w-2 h-2 bg-white rounded-full animate-bounce delay-100" />
-                </div>
+          <div className="w-16 h-16 bg-emerald-900 rounded-2xl shadow-lg border-2 border-white overflow-hidden flex items-center justify-center">
+             <div className="w-full h-full flex items-center justify-center">
+                <Bot className="text-white" size={36} strokeWidth={1.8} />
              </div>
           </div>
           
@@ -625,7 +638,7 @@ export function CourseDetail() {
              <div className="w-2 h-2 bg-white rounded-full animate-ping" />
           </div>
         </motion.div>
-      </div>
+      </aside>
 
       {/* Session Navigation Header */}
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
