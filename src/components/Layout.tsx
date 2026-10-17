@@ -15,7 +15,9 @@ import {
   GraduationCap,
   Users,
   HelpCircle,
-  Database
+  Database,
+  Cpu,
+  Home
 } from 'lucide-react';
 import { useAuth } from '../lib/useAuth';
 import { auth } from '../lib/firebase';
@@ -29,31 +31,31 @@ import { Chatbot } from './Chatbot';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { t, i18n } = useTranslation();
-  const { profile, isAdmin, isTeacher } = useAuth();
+  const { profile, isAdmin, isTeacher, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
-    await auth.signOut();
+    await logout();
     navigate('/login');
   };
 
   const navItems = [
-    { name: t('chatbot'), path: '/chatbot', icon: MessageSquare },
+    { name: t('dashboard') || 'الرئيسية', path: '/', icon: Home },
     { name: t('instructions'), path: '/instructions', icon: HelpCircle },
     { name: t('courses'), path: '/courses', icon: BookOpen },
     { name: t('activities'), path: '/activities', icon: LayoutDashboard },
+    { name: t('applications'), path: '/applications', icon: Cpu },
     { name: t('chat_room') || 'غرفة الدردشة', path: '/chat-room', icon: MessageSquare },
     { name: t('student_questions') || 'أسئلة واستفسارات الطلبة', path: '/student-questions', icon: MessageSquare },
-    { name: 'قاعدة المعرفة (RAG)', path: '/knowledge-base', icon: Database },
     { name: t('profile'), path: '/profile', icon: User },
   ];
 
   if (isAdmin || isTeacher) {
-    navItems.push({ name: t('teacher_dashboard') || 'لوحة تحكم المعلم', path: '/teacher', icon: LayoutDashboard });
-    navItems.push({ name: t('manage_users'), path: '/users', icon: Users });
+    navItems.push({ name: t('learning_analytics') || 'تحليلات التعلم', path: '/teacher', icon: LayoutDashboard });
     navItems.push({ name: t('quiz_management'), path: '/quizzes', icon: HelpCircle });
+    navItems.push({ name: t('manage_users'), path: '/users', icon: Users });
   }
 
   if (isAdmin) {
@@ -125,8 +127,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
 
-        {/* Chatbot */}
-        {location.pathname !== '/chatbot' && <Chatbot />}
+        {/* Chatbot - Available globally */}
+        <Chatbot />
       </main>
 
       {/* Mobile Menu */}

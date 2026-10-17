@@ -142,47 +142,50 @@ export function Profile() {
               {t('personal_info') || 'Personal Information'}
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">{t('full_name')}</p>
-                <div className="flex items-center gap-2 group">
-                  {isEditing ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        className="bg-background border rounded px-2 py-1 text-sm focus:ring-2 ring-primary/20 outline-none w-full"
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <p className="font-medium">{profile.displayName}</p>
-                      <button 
-                        onClick={() => setIsEditing(true)}
-                        className="p-1 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-primary transition-all"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">{t('email')}</p>
-                <p className="font-medium">{profile.email}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">{t('academic_id')}</p>
-                <p className="font-medium">{profile.uid.substring(0, 8).toUpperCase()}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">{t('status')}</p>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  {t(profile.status || 'active')}
-                </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="space-y-1 p-4 bg-muted/20 rounded-2xl border border-border/50">
+              <p className="text-[10px] font-black text-primary uppercase tracking-widest">{t('full_name')}</p>
+              <div className="flex items-center gap-2 group italic">
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="bg-background border rounded-lg px-3 py-1.5 text-sm w-full outline-none ring-2 ring-primary/20"
+                  />
+                ) : (
+                  <p className="font-bold text-lg">{profile.displayName}</p>
+                )}
               </div>
             </div>
+
+            <div className="space-y-1 p-4 bg-muted/20 rounded-2xl border border-border/50">
+              <p className="text-[10px] font-black text-primary uppercase tracking-widest">{t('email')}</p>
+              <p className="font-bold">{profile.email}</p>
+            </div>
+
+            <div className="space-y-1 p-4 bg-muted/20 rounded-2xl border border-border/50">
+              <p className="text-[10px] font-black text-primary uppercase tracking-widest">المستوى الأكاديمي</p>
+              <p className="font-bold">المستوى الرابع - مكملات الملابس</p>
+            </div>
+
+            <div className="space-y-1 p-4 bg-muted/20 rounded-2xl border border-border/50">
+              <p className="text-[10px] font-black text-primary uppercase tracking-widest">الفرقة الدراسية</p>
+              <p className="font-bold">الفرقة الرابعة - كلية التربية النوعية</p>
+            </div>
+
+            <div className="space-y-1 p-4 bg-muted/20 rounded-2xl border border-border/50">
+              <p className="text-[10px] font-black text-primary uppercase tracking-widest">{t('academic_id')}</p>
+              <p className="font-mono font-bold text-secondary">#{profile.uid.substring(0, 8).toUpperCase()}</p>
+            </div>
+
+            <div className="space-y-1 p-4 bg-muted/20 rounded-2xl border border-border/50">
+              <p className="text-[10px] font-black text-primary uppercase tracking-widest">{t('status')}</p>
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                {t(profile.status || 'active').toUpperCase()}
+              </span>
+            </div>
+          </div>
           </motion.div>
         </div>
       </div>

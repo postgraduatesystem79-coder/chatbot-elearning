@@ -124,19 +124,24 @@ loadMetaFromDisk();
 loadChunksFromDisk();
 
 // ===================== Server =====================
-async function startServer() {
-  const app = express();
-  const PORT = parseInt(process.env.PORT || "3000", 10);
+export const app = express();
+const PORT = parseInt(process.env.PORT || "3000", 10);
 
-  app.use(cors());
-  app.use(express.json());
+app.use(cors());
+app.use(express.json());
 
-  const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage() });
 
-  // Firebase init (client SDK)
-  const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
-  const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
-  initializeApp(firebaseConfig);
+// Firebase init (client SDK)
+const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+if (fs.existsSync(firebaseConfigPath)) {
+  try {
+    const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
+    initializeApp(firebaseConfig);
+  } catch (e) {
+    console.warn("[Firebase] Could not initialize client SDK:", e);
+  }
+}
 
   // Firebase Admin init - supports both env var (production) and local file (dev)
   if (admin.apps.length === 0) {
@@ -185,7 +190,191 @@ async function startServer() {
     }
   });
 
-  // ===================== Test AI =====================
+  // ===================== Local DB Fallback =====================
+  const DB_DIR = path.join(process.cwd(), "local_db");
+  if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
+  const COURSES_FILE = path.join(DB_DIR, "courses.json");
+  const SESSIONS_FILE = path.join(DB_DIR, "sessions.json");
+
+  function readLocalCourses(): any[] {
+    if (!fs.existsSync(COURSES_FILE)) return [];
+    try { return JSON.parse(fs.readFileSync(COURSES_FILE, "utf-8")); } catch { return []; }
+  }
+  function saveLocalCourses(data: any[]) {
+    try { fs.writeFileSync(COURSES_FILE, JSON.stringify(data, null, 2), "utf-8"); } catch (e) { console.error(e); }
+  }
+  function readLocalSessions(): any[] {
+    if (!fs.existsSync(SESSIONS_FILE)) return [];
+    try { return JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf-8")); } catch { return []; }
+  }
+  function saveLocalSessions(data: any[]) {
+    try { fs.writeFileSync(SESSIONS_FILE, JSON.stringify(data, null, 2), "utf-8"); } catch (e) { console.error(e); }
+  }
+
+  // ===================== Courses & Lessons Endpoints =====================
+  app.get("/api/courses", async (_req, res) => {
+    try {
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          const snapshot = await admin.firestore().collection("courses").get();
+          const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          if (items.length > 0) return res.json({ success: true, courses: items });
+        } catch (e) {
+          console.warn("[API] Firestore courses get failed, falling back to local file:", e);
+        }
+      }
+      res.json({ success: true, courses: readLocalCourses() });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/courses", async (req, res) => {
+    try {
+      const courseData = req.body;
+      const courseId = courseData.id || `course_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      courseData.id = courseId;
+      courseData.createdAt = courseData.createdAt || new Date().toISOString();
+
+      let savedToFirestore = false;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          await admin.firestore().collection("courses").doc(courseId).set(courseData, { merge: true });
+          savedToFirestore = true;
+          console.log(`[API] Saved course to Firestore: ${courseId}`);
+        } catch (e) {
+          console.warn("[API] Firestore course save failed, saving locally:", e);
+        }
+      }
+
+      // Always save to local backup
+      const list = readLocalCourses();
+      const idx = list.findIndex(c => c.id === courseId);
+      if (idx >= 0) list[idx] = { ...list[idx], ...courseData };
+      else list.unshift(courseData);
+      saveLocalCourses(list);
+
+      res.json({ success: true, id: courseId, savedToFirestore, course: courseData });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.get("/api/sessions", async (req, res) => {
+    try {
+      const courseId = req.query.courseId as string;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          let ref: any = admin.firestore().collection("sessions");
+          if (courseId) ref = ref.where("courseId", "==", courseId);
+          const snapshot = await ref.get();
+          const items = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+          if (items.length > 0) return res.json({ success: true, sessions: items });
+        } catch (e) {
+          console.warn("[API] Firestore sessions get failed, falling back to local file:", e);
+        }
+      }
+      const list = readLocalSessions();
+      let filtered = courseId ? list.filter(s => s.courseId === courseId) : list;
+      if (courseId && filtered.length === 0 && list.length > 0) {
+        filtered = list;
+      }
+      res.json({ success: true, sessions: filtered });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/sessions", async (req, res) => {
+    try {
+      const sessionData = req.body;
+      const sessionId = sessionData.id || `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      sessionData.id = sessionId;
+      sessionData.createdAt = sessionData.createdAt || new Date().toISOString();
+
+      let savedToFirestore = false;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          await admin.firestore().collection("sessions").doc(sessionId).set(sessionData, { merge: true });
+          savedToFirestore = true;
+          console.log(`[API] Saved session to Firestore: ${sessionId}`);
+        } catch (e) {
+          console.warn("[API] Firestore session save failed, saving locally:", e);
+        }
+      }
+
+      // Always save to local backup
+      const list = readLocalSessions();
+      const idx = list.findIndex(s => s.id === sessionId);
+      if (idx >= 0) list[idx] = { ...list[idx], ...sessionData };
+      else list.push(sessionData);
+      saveLocalSessions(list);
+
+      res.json({ success: true, id: sessionId, savedToFirestore, session: sessionData });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.get("/api/sessions/:id", async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          const docSnap = await admin.firestore().collection("sessions").doc(sessionId).get();
+          if (docSnap.exists) return res.json({ success: true, session: { id: docSnap.id, ...docSnap.data() } });
+        } catch (e) {
+          console.warn("[API] Firestore session get failed:", e);
+        }
+      }
+      const list = readLocalSessions();
+      const session = list.find(s => s.id === sessionId);
+      if (session) return res.json({ success: true, session });
+      res.status(404).json({ success: false, error: "Session not found" });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.delete("/api/courses/:id", async (req, res) => {
+    try {
+      const courseId = req.params.id;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          await admin.firestore().collection("courses").doc(courseId).delete();
+        } catch (e) {
+          console.warn("[API] Firestore course delete failed:", e);
+        }
+      }
+      const list = readLocalCourses();
+      const updated = list.filter(c => c.id !== courseId);
+      saveLocalCourses(updated);
+      res.json({ success: true, message: "Course deleted successfully" });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.delete("/api/sessions/:id", async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          await admin.firestore().collection("sessions").doc(sessionId).delete();
+        } catch (e) {
+          console.warn("[API] Firestore session delete failed:", e);
+        }
+      }
+      const list = readLocalSessions();
+      const updated = list.filter(s => s.id !== sessionId);
+      saveLocalSessions(updated);
+      res.json({ success: true, message: "Session deleted successfully" });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+
   app.get("/api/test-ai", async (req, res) => {
     try {
       const apiKey = getApiKey();
@@ -305,11 +494,9 @@ ${context || "لا يوجد سياق متاح."}
 
       // Try full models first, then fall back to lite and Gemma
       const MODELS = [
-        "gemini-2.5-flash-lite",
-        "gemini-2.0-flash-lite",
-        "gemini-2.5-flash",
-        "gemma-3-12b-it",
-        "gemma-3-27b-it"
+        "gemini-1.5-flash",
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-pro"
       ];
       let kbResult: any = null;
       
@@ -389,11 +576,9 @@ ${kbContext ? `\nلديك المحتوى التعليمي التالي من قا
 
       // Try lite models first (separate quota pools), then standard models
       const MODELS = [
-        "gemini-2.5-flash-lite",
-        "gemini-2.0-flash-lite",
-        "gemini-2.5-flash",
-        "gemma-3-12b-it",
-        "gemma-3-27b-it"
+        "gemini-1.5-flash",
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-pro"
       ];
       let lastError: any = null;
 
@@ -449,24 +634,29 @@ ${kbContext ? `\nلديك المحتوى التعليمي التالي من قا
   });
 
 
-  // ===================== Vite Middleware =====================
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+  // ===================== Vite Middleware / Static =====================
+  async function startServer() {
+    if (process.env.NODE_ENV !== "production") {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), "dist");
+      app.use(express.static(distPath));
+      app.get("*", (_req, res) => {
+        res.sendFile(path.join(distPath, "index.html"));
+      });
+    }
+
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
+  if (!process.env.VERCEL) {
+    startServer();
+  }
 
-startServer();
+  export default app;

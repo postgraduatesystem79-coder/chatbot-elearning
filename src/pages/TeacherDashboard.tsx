@@ -51,7 +51,9 @@ import {
   EyeOff,
   Download,
   Globe,
-  RefreshCw
+  RefreshCw,
+  MessageSquare,
+  Cpu
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -205,10 +207,7 @@ export function TeacherDashboard() {
         fail: stats.fail / total
       };
     });
-    setPassRateData(passRate.length > 0 ? passRate : [
-      { name: 'مقرر أ', pass: 0.85, fail: 0.15 },
-      { name: 'مقرر ب', pass: 0.92, fail: 0.08 }
-    ]);
+    setPassRateData(passRate.length > 0 ? passRate : []);
 
   }, [authorizedStudents, submissions, courses]);
 
@@ -340,7 +339,7 @@ export function TeacherDashboard() {
   };
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [editTab, setEditTab] = useState<'basic' | 'content' | 'activities' | 'evaluation'>('basic');
+  const [editTab, setEditTab] = useState<'basic' | 'content' | 'activities' | 'evaluation' | 'robot'>('basic');
   const [editingSession, setEditingSession] = useState<any>({
     title: '',
     webUrl: '',
@@ -350,6 +349,7 @@ export function TeacherDashboard() {
     pdfUrl: '',
     audioUrl: '',
     objectives: '',
+    robotInstructions: '',
     activities: [],
     evaluation: []
   });
@@ -365,6 +365,7 @@ export function TeacherDashboard() {
       pdfUrl: '',
       audioUrl: '',
       objectives: '',
+      robotInstructions: '',
       activities: [],
       evaluation: []
     });
@@ -384,6 +385,7 @@ export function TeacherDashboard() {
       pdfUrl: session.pdfUrl || '',
       audioUrl: session.audioUrl || '',
       objectives: (session.objectives || []).join('\n'),
+      robotInstructions: session.robotInstructions || '',
       activities: [...(session.activities || [])],
       evaluation: normalizeEvaluation(session.evaluation || [])
     });
@@ -423,6 +425,7 @@ export function TeacherDashboard() {
         pdfUrl: editingSession.pdfUrl,
         audioUrl: editingSession.audioUrl,
         objectives: newObjectives,
+        robotInstructions: editingSession.robotInstructions || '',
         activities: Array.isArray(editingSession.activities) ? editingSession.activities : [],
         evaluation: (Array.isArray(editingSession.evaluation) ? editingSession.evaluation : []).map((q: any) => {
           // Ensure each question has a correctId that exists in its options
@@ -691,6 +694,48 @@ export function TeacherDashboard() {
           >
             <Plus size={20} />
             <span>{t('create_course') || 'إنشاء مقرر جديد'}</span>
+          </button>
+          <button 
+            onClick={async () => {
+              if (window.confirm('هل أنت متأكد من حذف كافة رسائل الدردشة؟ لا يمكن التراجع عن هذا الإجراء.')) {
+                try {
+                  const { writeBatch, getDocs, collection } = await import('firebase/firestore');
+                  const q = query(collection(db, 'chat_messages'));
+                  const snapshot = await getDocs(q);
+                  const batch = writeBatch(db);
+                  snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                  await batch.commit();
+                  toast.success('تم حذف كافة الرسائل بنجاح');
+                } catch (e) {
+                  toast.error('حدث خطأ أثناء الحذف');
+                }
+              }
+            }}
+            className="p-3 rounded-xl border border-destructive/20 text-destructive hover:bg-destructive/5 transition-all"
+            title="حذف كافة رسائل الدردشة"
+          >
+            <MessageSquare size={20} />
+          </button>
+          <button 
+            onClick={async () => {
+              if (window.confirm('هل أنت متأكد من حذف كافة تسليمات الأنشطة؟ لا يمكن التراجع عن هذا الإجراء.')) {
+                try {
+                  const { writeBatch, getDocs, collection } = await import('firebase/firestore');
+                  const q = query(collection(db, 'submissions'));
+                  const snapshot = await getDocs(q);
+                  const batch = writeBatch(db);
+                  snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                  await batch.commit();
+                  toast.success('تم حذف كافة التسليمات بنجاح');
+                } catch (e) {
+                  toast.error('حدث خطأ أثناء الحذف');
+                }
+              }
+            }}
+            className="p-3 rounded-xl border border-destructive/20 text-destructive hover:bg-destructive/5 transition-all"
+            title="حذف كافة تسليمات الأنشطة"
+          >
+            <ClipboardList size={20} />
           </button>
         </div>
       </div>
@@ -1226,6 +1271,7 @@ export function TeacherDashboard() {
                   {[
                     { id: 'basic', label: 'الأساسية', icon: FileText },
                     { id: 'content', label: 'المحتوى', icon: Video },
+                    { id: 'robot', label: 'دعم الروبوت', icon: Cpu },
                     { id: 'activities', label: 'الأنشطة', icon: ClipboardList },
                     { id: 'evaluation', label: 'الأسئلة', icon: HelpCircle },
                   ].map((tab) => (
@@ -1402,6 +1448,37 @@ export function TeacherDashboard() {
                             />
                           </label>
                         </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {editTab === 'robot' && (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                    <div className="space-y-4">
+                      <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 flex items-start gap-4 mb-4">
+                        <div className="p-2 bg-primary/10 rounded-lg text-primary shrink-0">
+                          <Cpu size={20} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-sm text-primary mb-1">{t('robot_support_title')}</h4>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            {t('robot_support_help')}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold flex items-center gap-2">
+                          <MessageSquare size={16} className="text-primary" />
+                          تعليمات الروبوت لشرح هذا الدرس
+                        </label>
+                        <textarea 
+                          value={editingSession.robotInstructions}
+                          onChange={(e) => setEditingSession({...editingSession, robotInstructions: e.target.value})}
+                          className="w-full bg-muted border-none rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/20 transition-all font-medium min-h-[200px]"
+                          placeholder="اكتبي هنا ما تريدين من الروبوت أن يقوله للطالبات عند فتح هذا الدرس..."
+                        />
                       </div>
                     </div>
                   </div>

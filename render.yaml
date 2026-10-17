@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: chatbot-elearning
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.x
+      - key: VITE_MY_APP_KEY
+        sync: false
+      - key: FIREBASE_CLIENT_CONFIG
+        sync: false

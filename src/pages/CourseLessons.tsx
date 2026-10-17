@@ -30,7 +30,10 @@ import {
   HelpCircle,
   Target,
   Save,
-  Download
+  Download,
+  Cpu,
+  MessageSquare,
+  LayoutDashboard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../lib/useAuth';
@@ -58,7 +61,7 @@ export function CourseLessons() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [lessonToDelete, setLessonToDelete] = useState<string | null>(null);
-  const [editTab, setEditTab] = useState<'basic' | 'content' | 'activities' | 'evaluation'>('basic');
+  const [editTab, setEditTab] = useState<'basic' | 'content' | 'activities' | 'evaluation' | 'robot'>('basic');
   const [editingSession, setEditingSession] = useState<any>({
     title: '',
     webUrl: '',
@@ -70,6 +73,7 @@ export function CourseLessons() {
     code: '',
     generalObjective: '',
     objectives: '',
+    robotInstructions: '',
     activities: [],
     evaluation: []
   });
@@ -77,105 +81,69 @@ export function CourseLessons() {
   const handleAddLesson = async () => {
     if (!id || isCreating) return;
     setIsCreating(true);
-    try {
-      const lessonNumber = lessons.length + 1;
-      const firstLessonEvaluation = [
-        {
-          id: 'q1',
-          question: 'أي من العبارات التالية تُعبّر بدقة عن المقصود بالذكاء الاصطناعي في المجال التعليمي؟',
-          options: [
-            { id: 'a', text: 'استخدام أجهزة الحاسوب في عرض المحتوى الدراسي' },
-            { id: 'b', text: 'قدرة الأنظمة الرقمية على اتخاذ قرارات مستقلة ومتابعة سلوك المتعلم' },
-            { id: 'c', text: 'تسجيل الحضور والدرجات باستخدام نظم إلكترونية' },
-            { id: 'd', text: 'مشاركة المعلم لموارد تعليمية عبر البريد الإلكتروني' }
-          ],
-          correctId: 'b'
-        },
-        {
-          id: 'q2',
-          question: "اختر الخيار الذي يُفسر بصورة صحيحة آلية عمل 'التعلم الآلي' (Machine Learning) في التعليم:",
-          options: [
-            { id: 'a', text: 'يعتمد على الحدس البشري في بناء المحتوى' },
-            { id: 'b', text: 'يتبع سيناريوهات تعليمية ثابتة لا تتغير' },
-            { id: 'c', text: 'يتعلم من بيانات المتعلم ليطور قرارات مخصصة تلقائيًا' },
-            { id: 'd', text: 'يستخدم الإنترنت فقط لجلب المعلومات' }
-          ],
-          correctId: 'c'
-        },
-        {
-          id: 'q3',
-          question: 'أي من المجالات التالية لا تُعد من الاستخدامات المباشرة للذكاء الاصطناعي في تحسين جودة التعليم؟',
-          options: [
-            { id: 'a', text: 'تقديم تغذية راجعة فورية للطلاب' },
-            { id: 'b', text: 'التوصية بمصادر تعليمية مناسبة' },
-            { id: 'c', text: 'تصميم الأثاث المدرسي الذكي' },
-            { id: 'd', text: 'متابعة تقدم المتعلم عبر تحليلات الأداء' }
-          ],
-          correctId: 'c'
-        },
-        {
-          id: 'q4',
-          question: 'يتعلم طالب بشكل غير متوازن بين الرياضيات واللغة. ما الطريقة الأنسب التي يمكن للذكاء الاصطناعي اتباعها لتخصيص تعلمه؟',
-          options: [
-            { id: 'a', text: 'تقديم المحتوى ذاته لجميع المواد دون تعديل' },
-            { id: 'b', text: 'تعطيل المادة التي يعاني منها مؤقتًا' },
-            { id: 'c', text: 'تحليل أداء الطالب وتقديم مهام إضافية مخصصة في الرياضيات' },
-            { id: 'd', text: 'الاكتفاء برصد النتائج النهائية دون تدخل' }
-          ],
-          correctId: 'c'
-        },
-        {
-          id: 'q5',
-          question: 'أي من الخيارات التالية يُمثّل فائدة واقعية لتوظيف الذكاء الاصطناعي في تطوير التعليم من منظور تنظيمي ذاتي؟',
-          options: [
-            { id: 'a', text: 'تقليص دور المتعلم في اتخاذ القرار' },
-            { id: 'b', text: 'تسريع إنجاز الواجبات بلا فهم حقيقي' },
-            { id: 'c', text: 'دعم المتعلم بخطط مخصصة ومراجعة آلية لتقدمه' },
-            { id: 'd', text: 'إجبار المتعلم على اتباع مسار تعلم واحد فقط' }
-          ],
-          correctId: 'c'
-        },
-        {
-          id: 'q6',
-          question: 'هل يعتبر الذكاء الاصطناعي بديلاً كاملاً للمعلم في الفصل الدراسي؟',
-          options: [
-            { id: 'a', text: 'صح' },
-            { id: 'b', text: 'خطأ' }
-          ],
-          correctId: 'b'
-        }
-      ];
+    let newDocId: string | null = null;
+    const lessonNumber = lessons.length + 1;
+    const lessonTitle = `الدرس ${lessonNumber}`;
 
-      const newLesson = {
-        courseId: id,
-        title: `الدرس ${lessonNumber}`,
-        lessonNumber: lessonNumber,
-        description: `محتوى الدرس ${lessonNumber}`,
-        webUrl: '',
-        videoUrl: 'https://www.youtube.com/embed/y53kwdqTLNU',
-        code: '',
-        objectives: [
-          "الهدف الأول للدرس",
-          "الهدف الثاني للدرس"
-        ],
-        content: [
-          { id: 'web', type: 'web', title: 'صفحة ويب', color: 'text-blue-600' },
-          { id: 'video', type: 'video', title: 'فيديو تعليمي', color: 'text-purple-500', url: 'https://www.youtube.com/embed/y53kwdqTLNU' },
-          { id: 'pdf', type: 'pdf', title: 'ملف PDF', color: 'text-red-500' },
-        ],
-        activities: [],
-        evaluation: lessonNumber === 1 ? firstLessonEvaluation : [],
-        createdAt: serverTimestamp(),
-        status: 'published'
-      };
-      
-      const docRef = await addDoc(collection(db, 'sessions'), newLesson);
-      // Navigate to the newly created lesson
-      navigate(`/courses/${id}/lessons/${docRef.id}`);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'sessions');
+    const newLesson = {
+      courseId: id,
+      title: lessonTitle,
+      lessonNumber: lessonNumber,
+      description: `محتوى الدرس ${lessonNumber}`,
+      webUrl: '',
+      videoUrl: 'https://www.youtube.com/embed/y53kwdqTLNU',
+      code: '',
+      robotInstructions: '',
+      objectives: [
+        "التعرف على معايير الاختيار السليم لمكملات الملابس",
+        "تحديد البدائل الصحية الآمنة باستخدام تطبيقات الذكاء الاصطناعي"
+      ],
+      content: [
+        { id: 'web', type: 'web', title: 'صفحة ويب', color: 'text-blue-600' },
+        { id: 'video', type: 'video', title: 'فيديو تعليمي', color: 'text-purple-500', url: 'https://www.youtube.com/embed/y53kwdqTLNU' },
+        { id: 'pdf', type: 'pdf', title: 'ملف PDF', color: 'text-red-500' },
+      ],
+      activities: [
+        {
+          id: `act_${Date.now()}`,
+          title: `نشاط تفاعلي: فحص مكمل الملابس بالذكاء الاصطناعي`,
+          type: 'individual',
+          description: `استخدمي أداة التحليل الذكي لفحص مكمل الملابس وتحديد معايير الأمان الصحي والبدائل الآمنة.`,
+          interactiveType: 'ai_accessory_analyzer'
+        }
+      ],
+      evaluation: [],
+      status: 'published'
+    };
+
+    try {
+      // 1. Post to server API immediately (instant & guaranteed)
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLesson)
+      });
+      const json = await res.json();
+      if (json.success && json.id) {
+        newDocId = json.id;
+        const created = json.session || { ...newLesson, id: newDocId };
+        setLessons(prev => {
+          const exists = prev.some(l => l.id === newDocId);
+          return exists ? prev : [...prev, created];
+        });
+        toast.success(`تم إنشاء "${lessonTitle}" بنجاح`);
+      }
+
+      // 2. Also try Firestore in background without awaiting
+      addDoc(collection(db, 'sessions'), { ...newLesson, createdAt: serverTimestamp() }).catch(() => {});
+    } catch (err: any) {
+      console.warn("Session add error:", err);
+      toast.error(`تعذر إضافة الدرس: ${err.message || 'خطأ غير معروف'}`);
     } finally {
       setIsCreating(false);
+      if (newDocId) {
+        navigate(`/courses/${id}/lessons/${newDocId}`);
+      }
     }
   };
 
@@ -302,103 +270,63 @@ export function CourseLessons() {
   useEffect(() => {
     if (!id) return;
 
-    // Fetch course details
+    // 1. Fetch course details from local API first
+    fetch('/api/courses')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.courses) {
+          const found = json.courses.find((c: any) => c.id === id);
+          if (found) setCourse(found);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Fetch sessions from local API first
+    fetch(`/api/sessions?courseId=${id}`)
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.sessions && json.sessions.length > 0) {
+          setLessons(json.sessions);
+          setLoading(false);
+        } else {
+          // Try fetching all sessions in case courseId matches loosely
+          fetch('/api/sessions')
+            .then(r => r.json())
+            .then(allJson => {
+              if (allJson.success && allJson.sessions && allJson.sessions.length > 0) {
+                const matched = allJson.sessions.filter((s: any) => s.courseId === id || !s.courseId);
+                if (matched.length > 0) {
+                  setLessons(matched);
+                  setLoading(false);
+                }
+              }
+            }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+
+    // 3. Firestore live sync (gracefully ignores offline errors)
     const courseRef = doc(db, 'courses', id);
     getDoc(courseRef).then(docSnap => {
       if (docSnap.exists()) {
         setCourse({ id: docSnap.id, ...docSnap.data() });
       }
     }).catch(error => {
-      handleFirestoreError(error, OperationType.GET, `courses/${id}`);
+      console.warn("Firestore course get offline, using local API data:", error);
     });
 
-    // Fetch lessons (sessions) for this course
     const sessionsRef = collection(db, 'sessions');
     const q = query(sessionsRef, where('courseId', '==', id));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Lesson[];
-      // Sort by creation time if available
-      data.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
-      setLessons(data);
-      setLoading(false);
-
-      // Migration: Update first lesson with questions if missing
-      if (data.length > 0 && isTeacher) {
-        const firstLesson = data.find(l => l.lessonNumber === 1);
-        if (firstLesson && (!firstLesson.evaluation || firstLesson.evaluation.length === 0)) {
-          const firstLessonEvaluation = [
-            {
-              id: 'q1',
-              question: 'أي من العبارات التالية تُعبّر بدقة عن المقصود بالذكاء الاصطناعي في المجال التعليمي؟',
-              options: [
-                { id: 'a', text: 'استخدام أجهزة الحاسوب في عرض المحتوى الدراسي' },
-                { id: 'b', text: 'قدرة الأنظمة الرقمية على اتخاذ قرارات مستقلة ومتابعة سلوك المتعلم' },
-                { id: 'c', text: 'تسجيل الحضور والدرجات باستخدام نظم إلكترونية' },
-                { id: 'd', text: 'مشاركة المعلم لموارد تعليمية عبر البريد الإلكتروني' }
-              ],
-              correctId: 'b'
-            },
-            {
-              id: 'q2',
-              question: "اختر الخيار الذي يُفسر بصورة صحيحة آلية عمل 'التعلم الآلي' (Machine Learning) في التعليم:",
-              options: [
-                { id: 'a', text: 'يعتمد على الحدس البشري في بناء المحتوى' },
-                { id: 'b', text: 'يتبع سيناريوهات تعليمية ثابتة لا تتغير' },
-                { id: 'c', text: 'يتعلم من بيانات المتعلم ليطور قرارات مخصصة تلقائيًا' },
-                { id: 'd', text: 'يستخدم الإنترنت فقط لجلب المعلومات' }
-              ],
-              correctId: 'c'
-            },
-            {
-              id: 'q3',
-              question: 'أي من المجالات التالية لا تُعد من الاستخدامات المباشرة للذكاء الاصطناعي في تحسين جودة التعليم؟',
-              options: [
-                { id: 'a', text: 'تقديم تغذية راجعة فورية للطلاب' },
-                { id: 'b', text: 'التوصية بمصادر تعليمية مناسبة' },
-                { id: 'c', text: 'تصميم الأثاث المدرسي الذكي' },
-                { id: 'd', text: 'متابعة تقدم المتعلم عبر تحليلات الأداء' }
-              ],
-              correctId: 'c'
-            },
-            {
-              id: 'q4',
-              question: 'يتعلم طالب بشكل غير متوازن بين الرياضيات واللغة. ما الطريقة الأنسب التي يمكن للذكاء الاصطناعي اتباعها لتخصيص تعلمه؟',
-              options: [
-                { id: 'a', text: 'تقديم المحتوى ذاته لجميع المواد دون تعديل' },
-                { id: 'b', text: 'تعطيل المادة التي يعاني منها مؤقتًا' },
-                { id: 'c', text: 'تحليل أداء الطالب وتقديم مهام إضافية مخصصة في الرياضيات' },
-                { id: 'd', text: 'الاكتفاء برصد النتائج النهائية دون تدخل' }
-              ],
-              correctId: 'c'
-            },
-            {
-              id: 'q5',
-              question: 'أي من الخيارات التالية يُمثّل فائدة واقعية لتوظيف الذكاء الاصطناعي في تطوير التعليم من منظور تنظيمي ذاتي؟',
-              options: [
-                { id: 'a', text: 'تقليص دور المتعلم في اتخاذ القرار' },
-                { id: 'b', text: 'تسريع إنجاز الواجبات بلا فهم حقيقي' },
-                { id: 'c', text: 'دعم المتعلم بخطط مخصصة ومراجعة آلية لتقدمه' },
-                { id: 'd', text: 'إجبار المتعلم على اتباع مسار تعلم واحد فقط' }
-              ],
-              correctId: 'c'
-            },
-            {
-              id: 'q6',
-              question: 'هل يعتبر الذكاء الاصطناعي بديلاً كاملاً للمعلم في الفصل الدراسي؟',
-              options: [
-                { id: 'a', text: 'صح' },
-                { id: 'b', text: 'خطأ' }
-              ],
-              correctId: 'b'
-            }
-          ];
-          setDoc(doc(db, 'sessions', firstLesson.id), { evaluation: firstLessonEvaluation }, { merge: true })
-            .catch(err => console.error("Migration error:", err));
-        }
+      if (data.length > 0) {
+        data.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+        setLessons(data);
       }
+      setLoading(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'sessions');
+      console.warn("Firestore sessions list offline, using local API data:", error);
       setLoading(false);
     });
 
@@ -621,6 +549,7 @@ export function CourseLessons() {
                   {[
                     { id: 'basic', label: 'الأساسية', icon: FileText },
                     { id: 'content', label: 'المحتوى', icon: Video },
+                    { id: 'robot', label: 'دعم الروبوت', icon: Cpu },
                     { id: 'activities', label: 'الأنشطة', icon: ClipboardList },
                     { id: 'evaluation', label: 'الأسئلة', icon: HelpCircle },
                   ].map((tab) => (
@@ -667,6 +596,34 @@ export function CourseLessons() {
                           className="w-full bg-muted border-none rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/20 transition-all font-medium min-h-[150px]"
                         />
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {editTab === 'robot' && (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                    <div className="bg-primary/5 p-4 rounded-2xl border border-primary/20 flex items-start gap-4">
+                      <div className="p-2 bg-primary/20 rounded-xl text-primary mt-1">
+                        <MessageSquare size={20} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm mb-1">تعليمات الروبوت المخصص</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          أدخلي هنا التعليمات التي ترغبين أن يقوم الروبوت التعليمي بالتركيز عليها لهذا الدرس.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold flex items-center gap-2">
+                        <Cpu size={16} className="text-primary" />
+                        تعليمات المساعد الذكي
+                      </label>
+                      <textarea 
+                        value={editingSession.robotInstructions}
+                        onChange={(e) => setEditingSession({...editingSession, robotInstructions: e.target.value})}
+                        className="w-full bg-muted border-none rounded-2xl px-4 py-4 outline-none focus:ring-2 ring-primary/20 transition-all font-medium min-h-[200px]"
+                      />
                     </div>
                   </div>
                 )}

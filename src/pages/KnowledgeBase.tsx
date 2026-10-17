@@ -195,7 +195,7 @@ export default function KnowledgeBase() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-slate-900">إدارة قاعدة المعرفة (RAG)</h2>
-          <p className="text-slate-500 mt-1">رفع ملفات مهارات ريادة الأعمال الرقمية وتدريب المساعد الذكي</p>
+          <p className="text-slate-500 mt-1">رفع ملفات الوعي الصحي لمكملات الملابس وتدريب المساعد الذكي</p>
         </div>
         <div className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-xl font-bold">
           <Database size={20} />

@@ -2,13 +2,14 @@ import { initializeApp, getApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { toast } from 'sonner';
 // @ts-ignore
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const storage = getStorage(app, `gs://${firebaseConfig.storageBucket}`);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 // Secondary app for creating users without signing out the current user
 export const createSecondaryAuth = () => {
@@ -82,17 +83,26 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   }
 
   console.error('Firestore Error: ', jsonString);
-  throw new Error(jsonString);
+  try {
+    if (errorMessage.includes('permission-denied') || errorMessage.includes('Missing or insufficient permissions')) {
+      toast.error('خطأ في الصلاحيات: ليس لديك صلاحية تنفيذ هذه العملية (تأكد من تسجيل الدخول بحساب المعلم)');
+    } else {
+      toast.error(`حدث خطأ: ${errorMessage}`);
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
-// Test connection
+// Test connection (non-blocking)
 async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration. ");
-    }
+    // Non-critical background connection check
   }
 }
-testConnection();
+// Run non-blocking
+setTimeout(() => {
+  testConnection().catch(() => {});
+}, 1000);

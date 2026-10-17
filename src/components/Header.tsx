@@ -5,12 +5,14 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 export function Header() {
-  const { profile } = useAuth();
+  const { profile, isTeacher, isAdmin, setRole } = useAuth();
   const { t } = useTranslation();
   const navigate = useNavigate();
 
+  const roleTitle = isAdmin ? 'مدير النظام' : (isTeacher ? 'معلم المقرر' : 'طالب');
+
   return (
-    <header className="bg-gradient-to-r from-[#4D2C91] to-[#00D2FF] border-b border-white/10 px-6 py-4 sticky top-0 z-30 font-sans shadow-lg" dir="rtl">
+    <header className="bg-gradient-to-r from-primary to-secondary border-b border-white/10 px-6 py-4 sticky top-0 z-30 font-sans shadow-lg" dir="rtl">
       <div className="max-w-[1600px] mx-auto flex flex-col lg:flex-row items-center justify-between gap-6">
         
         {/* Right Section: University Name */}
@@ -30,9 +32,33 @@ export function Header() {
 
         {/* Left Section: Faculty & User Profile */}
         <div className="flex flex-col items-center lg:items-end gap-2">
-          <span className="text-white/90 text-sm font-semibold">
-            {t('college_name')}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-white/90 text-sm font-semibold">
+              {t('college_name')}
+            </span>
+
+            {/* Quick Role Switcher Pill */}
+            <div className="flex items-center bg-black/25 p-1 rounded-xl text-xs font-bold border border-white/10">
+              <button
+                type="button"
+                onClick={() => setRole('teacher')}
+                className={`px-3 py-1 rounded-lg transition-all ${
+                  isTeacher ? "bg-white text-primary shadow-md font-black" : "text-white/70 hover:text-white"
+                }`}
+              >
+                معلم
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole('student')}
+                className={`px-3 py-1 rounded-lg transition-all ${
+                  !isTeacher ? "bg-white text-primary shadow-md font-black" : "text-white/70 hover:text-white"
+                }`}
+              >
+                طالب
+              </button>
+            </div>
+          </div>
           
           <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md p-1.5 px-4 rounded-xl border border-white/20 shadow-xl">
             {/* Notifications */}
@@ -54,10 +80,10 @@ export function Header() {
             >
               <div className="flex flex-col items-start">
                 <span className="text-white font-bold text-sm leading-none">
-                  {profile?.displayName || 'admin'}
+                  {profile?.displayName || t('teacher_name')}
                 </span>
-                <span className="text-white/60 text-[10px] mt-1 font-medium uppercase tracking-wider">
-                  {profile?.role === 'admin' ? 'مدير' : 'معلم'}
+                <span className="text-white/80 text-[10px] mt-1 font-bold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded">
+                  {roleTitle}
                 </span>
               </div>
 
