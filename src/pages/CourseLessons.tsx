@@ -41,6 +41,7 @@ import { toast } from 'sonner';
 import { cn, getYouTubeEmbedUrl, normalizeEvaluation } from '../lib/utils';
 import { CourseJourneyPanel, useCourseJourney } from '../components/CourseJourney';
 import { compareJourneyLessons } from '../lib/courseJourney';
+import { DEFAULT_COURSES, DEFAULT_COURSE, DEFAULT_SESSIONS, syncDefaultDataToFirestore } from '../lib/defaultData';
 
 interface Lesson {
   id: string;
@@ -306,9 +307,17 @@ export function CourseLessons() {
         .filter(lesson => !deletedLessonIds.current.has(lesson.id))
         .sort(compareJourneyLessons));
     };
-    setLoading(true);
-    setCourse(null);
-    setLessons([]);
+
+    const defaultFoundCourse = DEFAULT_COURSES.find(c => c.id === id) || DEFAULT_COURSE;
+    const defaultLessonsForCourse = DEFAULT_SESSIONS.filter(s => s.courseId === id || !s.courseId || s.courseId === defaultFoundCourse.id);
+    
+    setCourse(defaultFoundCourse);
+    apiLessons = defaultLessonsForCourse;
+    refreshLessons();
+    setLoading(false);
+
+    // Sync in background
+    syncDefaultDataToFirestore(db);
 
     // 1. Fetch course details from local API first
     fetch('/api/courses')
@@ -325,7 +334,7 @@ export function CourseLessons() {
     fetch(`/api/sessions?courseId=${id}`)
       .then(res => res.json())
       .then(json => {
-        if (json.success && Array.isArray(json.sessions)) {
+        if (json.success && Array.isArray(json.sessions) && json.sessions.length > 0) {
           (json.deletedIds || []).forEach((lessonId: string) => deletedLessonIds.current.add(lessonId));
           apiLessons = json.sessions.filter((lesson: Lesson) => lesson.courseId === id);
           refreshLessons();
@@ -341,7 +350,7 @@ export function CourseLessons() {
         setCourse({ id: docSnap.id, ...docSnap.data() });
       }
     }).catch(error => {
-      console.warn("Firestore course get offline, using local API data:", error);
+      console.warn("Firestore course get offline, using local data:", error);
     });
 
     const sessionsRef = collection(db, 'sessions');
@@ -349,11 +358,13 @@ export function CourseLessons() {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Lesson[];
-      liveLessons = data;
-      refreshLessons();
+      if (data.length > 0) {
+        liveLessons = data;
+        refreshLessons();
+      }
       if (active) setLoading(false);
     }, (error) => {
-      console.warn("Firestore sessions list offline, using local API data:", error);
+      console.warn("Firestore sessions list offline, using local data:", error);
       if (active) setLoading(false);
     });
 

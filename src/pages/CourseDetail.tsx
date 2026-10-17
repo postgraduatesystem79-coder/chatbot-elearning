@@ -48,6 +48,7 @@ import { storage } from '../lib/firebase';
 import { AIInteractiveActivity } from '../components/AIInteractiveActivity';
 import { useCourseJourney } from '../components/CourseJourney';
 import { sessionUpdatedAt } from '../lib/sessionVersion';
+import { DEFAULT_SESSIONS } from '../lib/defaultData';
 
 export function CourseDetail() {
   const { courseId, lessonId } = useParams();
@@ -257,6 +258,31 @@ export function CourseDetail() {
   // Fetch session data with resilient API fallback
   useEffect(() => {
     const sessionId = lessonId || 'session-1';
+
+    // 0. Fallback immediately to default session if available
+    const defaultSession = DEFAULT_SESSIONS.find(s => s.id === sessionId || String(s.lessonNumber) === sessionId || (s.id && s.id.includes(sessionId)));
+    if (defaultSession) {
+      setSessionData(previous => sessionUpdatedAt(previous) > sessionUpdatedAt(defaultSession) ? previous : {
+        ...defaultSession,
+        evaluation: normalizeEvaluation(defaultSession.evaluation || [])
+      });
+      setEditingSession({
+        title: defaultSession.title || '',
+        generalObjective: defaultSession.generalObjective || '',
+        webUrl: defaultSession.webUrl || '',
+        videoUrl: defaultSession.videoUrl || '',
+        wordUrl: defaultSession.wordUrl || '',
+        pptUrl: defaultSession.pptUrl || '',
+        pdfUrl: defaultSession.pdfUrl || '',
+        audioUrl: defaultSession.audioUrl || '',
+        code: defaultSession.code || '',
+        objectives: (defaultSession.objectives || []).join('\n'),
+        activities: [...(defaultSession.activities || [])],
+        evaluation: normalizeEvaluation(defaultSession.evaluation || [])
+      });
+      setIsLoading(false);
+      setLoadedLessonId(sessionId);
+    }
 
     // 1. Fetch from local API first
     fetch(`/api/sessions/${sessionId}`)

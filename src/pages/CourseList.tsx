@@ -25,13 +25,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../lib/useAuth';
 import { toast } from 'sonner';
+import { DEFAULT_COURSES, syncDefaultDataToFirestore } from '../lib/defaultData';
 
 export function CourseList() {
   const { t } = useTranslation();
   const { isTeacher, profile } = useAuth();
   const navigate = useNavigate();
-  const [courses, setCourses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [courses, setCourses] = useState<any[]>(DEFAULT_COURSES);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [category, setCategory] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -145,18 +146,20 @@ export function CourseList() {
   };
 
   useEffect(() => {
-    // 1. Load instantly from server API
+    // 1. Sync default courses & sessions to Firestore in background
+    syncDefaultDataToFirestore(db);
+
+    // 2. Load from server API if available
     fetch('/api/courses')
       .then(res => res.json())
       .then(json => {
         if (json.success && json.courses && json.courses.length > 0) {
           setCourses(json.courses);
-          setLoading(false);
         }
       })
       .catch(() => {});
 
-    // 2. Also listen to Firestore live updates
+    // 3. Listen to Firestore live updates
     const coursesRef = collection(db, 'courses');
     const q = isTeacher 
       ? query(coursesRef)
@@ -166,9 +169,15 @@ export function CourseList() {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       if (data.length > 0) {
         setCourses(data);
+      } else {
+        // Empty Firestore: trigger sync and retain default courses
+        syncDefaultDataToFirestore(db);
+        setCourses(DEFAULT_COURSES);
       }
       setLoading(false);
-    }, async () => {
+    }, (error) => {
+      console.warn("Firestore snapshot warning:", error);
+      setCourses(DEFAULT_COURSES);
       setLoading(false);
     });
     return () => unsubscribe();
