@@ -1,4 +1,5 @@
 {
+  "firestore": [{ "database": "clothing-ai-health", "rules": "firestore.rules" }],
   "hosting": {
     "site": "clothing-ai-health",
     "public": "dist",

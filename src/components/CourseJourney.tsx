@@ -5,6 +5,7 @@ import { useAuth } from '../lib/useAuth';
 import { assessmentLabels, emptyConfig, emptyProgress, scaleOptions, statementResponse, validateConfig, type AssessmentStage, type JourneyConfig, type JourneyProgress, type JourneyStage } from '../lib/courseJourney';
 import { toast } from 'sonner';
 import { CheckCircle2, Lock, Plus, Trash2, Save } from 'lucide-react';
+import { firebaseJourneyRequest } from '../lib/firebaseJourney';
 
 interface JourneyData { config: JourneyConfig; progress: JourneyProgress; lessonIds: string[]; stage: JourneyStage; canManage: boolean }
 interface JourneyContext extends JourneyData { refresh: () => Promise<void>; completeLesson: (id: string, answers?: number[]) => Promise<void> }
@@ -12,6 +13,7 @@ const Context = createContext<JourneyContext | null>(null);
 export function useCourseJourney() { return useContext(Context); }
 export async function journeyRequest(courseId: string, path = '', body?: unknown, method = 'POST') {
   await auth.authStateReady();
+  if (!['localhost', '127.0.0.1'].includes(window.location.hostname)) return firebaseJourneyRequest(courseId, path, body);
   const currentUser = auth.currentUser;
   const token = await currentUser?.getIdToken();
   if (!token) throw Object.assign(new Error('يُرجى تسجيل الدخول مجددًا لفتح التقييمات'), { code: 'AUTH_REQUIRED' });

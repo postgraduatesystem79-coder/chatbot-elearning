@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 
 interface AuthContextType {
@@ -113,6 +113,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const newProfile = { ...data, uid: user.uid };
           setProfile(newProfile);
           localStorage.setItem('auth_profile', JSON.stringify(newProfile));
+        } else {
+          const email = (user.email || '').toLowerCase();
+          const role = email === 'admin@system.com' ? 'admin' : email === 'teacher@system.com' ? 'teacher' : 'student';
+          const initialProfile = { uid: user.uid, email: user.email || '', displayName: user.displayName || (role === 'student' ? 'طالبة المقرر' : 'معلم المقرر'), role, status: 'active', createdAt: serverTimestamp(), stats: {} };
+          setDoc(doc(db, 'users', user.uid), initialProfile).catch(error => console.warn('Profile initialization failed:', error.code));
         }
         setLoading(false);
       }, (error) => {
@@ -123,15 +128,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [user?.uid]);
 
-  const isAdmin = roleOverride === 'admin' || profile?.role === 'admin' || ['postgraduatesystem79@gmail.com', 'gradateminia@gmail.com', 'drosamaayed@gmail.com', 'admin@adptive.edu.eg', 'admin@system.com'].includes(user?.email || '');
-  const isTeacher = roleOverride === 'teacher' || (!roleOverride && profile?.role === 'teacher') || isAdmin || (roleOverride !== 'student' && profile?.role !== 'student');
-  const isStudent = roleOverride === 'student' || (!isTeacher && !isAdmin);
+  const emailLower = (user?.email || '').toLowerCase();
+  const isAdmin = roleOverride === 'admin' || profile?.role === 'admin' || [
+    'postgraduatesystem79@gmail.com', 
+    'gradateminia@gmail.com', 
+    'drosamaayed@gmail.com', 
+    'admin@adptive.edu.eg', 
+    'admin@system.com'
+  ].includes(emailLower);
+
+  const isExplicitStudent = emailLower === 'student@system.com' || roleOverride === 'student' || profile?.role === 'student';
+  const isExplicitTeacher = emailLower === 'teacher@system.com' || roleOverride === 'teacher' || profile?.role === 'teacher';
+
+  const isTeacher = !isExplicitStudent && (isAdmin || isExplicitTeacher || (roleOverride === 'teacher'));
+  const isStudent = isExplicitStudent || (!isTeacher && !isAdmin);
+
+  let effectiveProfile = profile ? { ...profile } : { uid: user?.uid, email: user?.email };
+  if (isStudent) {
+    effectiveProfile = { ...effectiveProfile, role: 'student', status: 'active', displayName: effectiveProfile.displayName || 'طالبة المقرر' };
+  } else if (isAdmin) {
+    effectiveProfile = { ...effectiveProfile, role: 'admin', status: 'active', displayName: effectiveProfile.displayName || 'مدير النظام' };
+  } else if (isTeacher) {
+    effectiveProfile = { ...effectiveProfile, role: 'teacher', status: 'active', displayName: effectiveProfile.displayName || 'معلم المقرر' };
+  }
 
   const value = {
     user,
-    profile: isAdmin 
-      ? { ...profile, status: 'active', role: 'admin' } 
-      : (isTeacher ? { ...profile, status: 'active', role: 'teacher' } : profile),
+    profile: effectiveProfile,
     loading,
     isAdmin,
     isTeacher,

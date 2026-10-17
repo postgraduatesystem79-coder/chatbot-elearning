@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { collection, onSnapshot, query, where, addDoc, setDoc, serverTimestamp, doc, updateDoc, deleteDoc, increment } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Filter, 
@@ -287,6 +287,7 @@ export function CourseList() {
     course.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
     (category === 'all' || course.category === category)
   );
+  if (!isTeacher && !loading && courses.length === 1) return <Navigate to={`/courses/${courses[0].id}`} replace />;
 
   return (
     <div className="space-y-8">
@@ -298,7 +299,7 @@ export function CourseList() {
           </h2>
           <p className="text-muted-foreground font-medium">{isTeacher ? 'إدارة دروس المنهج التعليمي' : 'استكشف الدروس التعليمية الخاصة بالبحث'}</p>
         </div>
-        <div className="flex gap-4 flex-wrap">
+        {isTeacher && <div className="flex gap-4 flex-wrap">
           <button 
             onClick={() => {
               setEditingCourseId(null);
@@ -329,7 +330,7 @@ export function CourseList() {
             <FileText size={24} />
             <span className="text-lg">إضافة درس</span>
           </button>
-        </div>
+        </div>}
       </div>
 
       {/* Course Grid */}
@@ -452,30 +453,13 @@ export function CourseList() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2">
-                  {profile?.enrolledCourses?.includes(course.id) ? (
                     <Link 
                       to={`/courses/${course.id}`}
                       className="col-span-2 bg-muted/50 py-3 text-center text-sm font-bold hover:bg-primary hover:text-primary-foreground transition-all flex items-center justify-center gap-2"
                     >
-                      <span>{t('view_course') || 'عرض الدرس'}</span>
+                      <span>بدء الاختبار ومتابعة المحتوى</span>
                       <ArrowRight size={16} />
                     </Link>
-                  ) : (
-                    <button 
-                      onClick={() => handleEnroll(course.id)}
-                      disabled={enrollingId === course.id}
-                      className="col-span-2 bg-primary text-primary-foreground py-3 text-center text-sm font-bold hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {enrollingId === course.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <>
-                          <span>تسجيل في المقرر</span>
-                          <Plus size={16} />
-                        </>
-                      )}
-                    </button>
-                  )}
                 </div>
               )}
             </div>
