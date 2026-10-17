@@ -15,7 +15,7 @@ export function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<'student' | 'teacher'>('student');
+  const [role, setRole] = useState<'student' | 'teacher' | 'admin'>('student');
   const [courseCode, setCourseCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ export function Signup() {
         const querySnapshot = await getDocs(q);
         
         if (querySnapshot.empty) {
-          throw new Error(t('invalid_course_code') || 'Invalid course code. Please check with your teacher.');
+          throw new Error(t('invalid_course_code') || 'رمز المقرر غير صحيح. يرجى مراجعة المعلم.');
         } else {
           const courseDoc = querySnapshot.docs[0];
           const courseData = courseDoc.data();
@@ -48,7 +48,7 @@ export function Signup() {
         }
       }
 
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
       const user = userCredential.user;
 
       await updateProfile(user, { displayName: name });
@@ -62,15 +62,25 @@ export function Signup() {
       }
 
       const path = `users/${user.uid}`;
-      const isAdminEmail = ['postgraduatesystem79@gmail.com', 'gradateminia@gmail.com', 'drosamaayed@gmail.com', 'admin@adptive.edu.eg', 'admin@system.com'].includes(user.email || '');
+      const isAdminEmail = [
+        'postgraduatesystem79@gmail.com', 
+        'gradateminia@gmail.com', 
+        'drosamaayed@gmail.com', 
+        'admin@adptive.edu.eg', 
+        'admin@system.com'
+      ].includes(user.email || '') || role === 'admin';
+      
+      const userRole = isAdminEmail || role === 'admin' ? 'admin' : role;
+      const isApproved = isAdminEmail || role === 'admin' || role === 'teacher';
+
       try {
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           displayName: name,
           email: user.email,
-          role: isAdminEmail ? 'admin' : role,
+          role: userRole,
           teacherId: teacherId, // Save teacherId
-          status: isAdminEmail || role === 'teacher' ? 'active' : 'pending',
+          status: isApproved ? 'active' : 'pending',
           enrolledCourses: enrolledCourses,
           progress: 0,
           createdAt: serverTimestamp(),
@@ -94,7 +104,7 @@ export function Signup() {
         handleFirestoreError(err, OperationType.WRITE, path);
       }
 
-      navigate('/chatbot');
+      navigate('/courses');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -103,18 +113,21 @@ export function Signup() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 font-sans rtl">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4 font-sans rtl" dir="rtl">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md bg-card p-8 rounded-2xl shadow-xl border border-border"
       >
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-4 shadow-inner">
+        <div className="flex flex-col items-center mb-6 text-center">
+          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mb-3 shadow-inner">
             <GraduationCap size={40} strokeWidth={1.5} />
           </div>
+          <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-full mb-2">
+            تطبيقات الذكاء الاصطناعي لتنمية الوعي الصحي بمكملات الملابس
+          </span>
           <h1 className="text-2xl font-bold text-foreground">{t('signup')}</h1>
-          <p className="text-muted-foreground text-sm mt-2 font-medium">{t('create_your_account') || 'Join our learning community'}</p>
+          <p className="text-muted-foreground text-sm mt-1 font-medium">{t('create_your_account') || 'انضمي إلى المنصة التعليمية'}</p>
         </div>
 
         {error && (
@@ -178,27 +191,37 @@ export function Signup() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-bold text-muted-foreground">{t('i_am_a') || 'I am a'}</label>
-            <div className="grid grid-cols-2 gap-4">
+            <label className="text-sm font-bold text-muted-foreground">{t('i_am_a') || 'نوع الحساب'}</label>
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setRole('student')}
                 className={cn(
-                  "py-2.5 rounded-xl border font-bold transition-all",
+                  "py-2.5 rounded-xl border font-bold text-xs transition-all",
                   role === 'student' ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" : "bg-muted/50 hover:bg-muted border-border"
                 )}
               >
-                {t('student')}
+                {t('student') || 'حساب طالب'}
               </button>
               <button
                 type="button"
                 onClick={() => setRole('teacher')}
                 className={cn(
-                  "py-2.5 rounded-xl border font-bold transition-all",
+                  "py-2.5 rounded-xl border font-bold text-xs transition-all",
                   role === 'teacher' ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" : "bg-muted/50 hover:bg-muted border-border"
                 )}
               >
-                {t('teacher')}
+                {t('teacher') || 'حساب معلم'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole('admin')}
+                className={cn(
+                  "py-2.5 rounded-xl border font-bold text-xs transition-all",
+                  role === 'admin' ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" : "bg-muted/50 hover:bg-muted border-border"
+                )}
+              >
+                {t('admin') || 'مدير النظام'}
               </button>
             </div>
           </div>

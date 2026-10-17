@@ -11,6 +11,7 @@ import { Dashboard } from './pages/Dashboard';
 import { CourseList } from './pages/CourseList';
 import { CourseLessons } from './pages/CourseLessons';
 import { CourseDetail } from './pages/CourseDetail';
+import { HomePage } from './pages/HomePage';
 import { ChatbotPage } from './pages/ChatbotPage';
 import { Forum } from './pages/Forum';
 import { Profile } from './pages/Profile';
@@ -21,21 +22,13 @@ import { QuizManagement } from './pages/QuizManagement';
 import StudentQuestions from './pages/StudentQuestions';
 import ChatRoom from './pages/ChatRoom';
 import KnowledgeBase from './pages/KnowledgeBase';
+import { Applications } from './pages/Applications';
 import { Toaster } from 'sonner';
 import './i18n';
 
-function Home() {
-  const { isTeacher, isAdmin, loading } = useAuth();
-  
-  if (loading) return null;
-  if (isAdmin) return <Navigate to="/admin" />;
-  if (isTeacher) return <Navigate to="/teacher" />;
-  
-  return <Navigate to="/chatbot" />;
-}
 
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
   const { i18n } = useTranslation();
 
   useEffect(() => {
@@ -44,6 +37,8 @@ function AppRoutes() {
     document.documentElement.lang = i18n.language;
   }, [i18n.language]);
 
+  // Disabled blocking loading to debug the UI updates
+  /*
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
@@ -51,6 +46,7 @@ function AppRoutes() {
       </div>
     );
   }
+  */
 
   return (
     <Routes>
@@ -67,7 +63,7 @@ function AppRoutes() {
       <Route path="/" element={
         <ProtectedRoute>
           <Layout>
-            <Home />
+            <HomePage />
           </Layout>
         </ProtectedRoute>
       } />
@@ -104,13 +100,14 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
-      <Route path="/chatbot" element={
+      <Route path="/applications" element={
         <ProtectedRoute>
           <Layout>
-            <ChatbotPage />
+            <Applications />
           </Layout>
         </ProtectedRoute>
       } />
+
 
       <Route path="/forum" element={
         <ProtectedRoute>
@@ -144,13 +141,6 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
-      <Route path="/knowledge-base" element={
-        <ProtectedRoute requiredRole="teacher">
-          <Layout>
-            <KnowledgeBase />
-          </Layout>
-        </ProtectedRoute>
-      } />
 
       <Route path="/teacher" element={
         <ProtectedRoute requiredRole="teacher">

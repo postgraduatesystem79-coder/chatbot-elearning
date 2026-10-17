@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: chatvot-elearning
+    name: chatbot-elearning
     env: node
     buildCommand: npm install && npm run build
     startCommand: npm start

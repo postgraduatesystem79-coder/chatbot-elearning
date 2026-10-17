@@ -28,14 +28,10 @@ class MemoryVectorStore {
   }
   async similaritySearch(query: string, k: number) {
     if (this.docs.length === 0) return [];
-    const keywords = query.toLowerCase().split(/[^\w\u0621-\u064A]+/).filter((w) => w.length > 2);
+    const keywords = query.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
     const scoredDocs = this.docs.map((doc) => {
       const content = doc.pageContent.toLowerCase();
       let score = keywords.reduce((s, kw) => s + (content.includes(kw) ? 1 : 0), 0);
-      // Give bonus for matching more keywords
-      if (score > 0) {
-        score += (score / keywords.length) * 0.5;
-      }
       return { doc, score };
     });
     const results = scoredDocs
@@ -134,27 +130,18 @@ const PORT = parseInt(process.env.PORT || "3000", 10);
 app.use(cors());
 app.use(express.json());
 
-// Normalize /api path in serverless environments if stripped
-app.use((req, _res, next) => {
-  if (process.env.VERCEL && !req.url.startsWith("/api")) {
-    req.url = "/api" + req.url;
-  }
-  next();
-});
-
 const upload = multer({ storage: multer.memoryStorage() });
 
-  // Firebase init (client SDK) - reads from env var in production, file in dev
-  let firebaseConfig: any;
-  if (process.env.FIREBASE_CLIENT_CONFIG) {
-    firebaseConfig = JSON.parse(process.env.FIREBASE_CLIENT_CONFIG);
-    console.log("[Firebase] Initialized from env var");
-  } else {
-    const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
-    firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
-    console.log("[Firebase] Initialized from local file");
+// Firebase init (client SDK)
+const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+if (fs.existsSync(firebaseConfigPath)) {
+  try {
+    const firebaseConfig = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
+    initializeApp(firebaseConfig);
+  } catch (e) {
+    console.warn("[Firebase] Could not initialize client SDK:", e);
   }
-  initializeApp(firebaseConfig);
+}
 
   // Firebase Admin init - supports both env var (production) and local file (dev)
   if (admin.apps.length === 0) {
@@ -203,12 +190,196 @@ const upload = multer({ storage: multer.memoryStorage() });
     }
   });
 
-  // ===================== Test AI =====================
+  // ===================== Local DB Fallback =====================
+  const DB_DIR = path.join(process.cwd(), "local_db");
+  if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
+  const COURSES_FILE = path.join(DB_DIR, "courses.json");
+  const SESSIONS_FILE = path.join(DB_DIR, "sessions.json");
+
+  function readLocalCourses(): any[] {
+    if (!fs.existsSync(COURSES_FILE)) return [];
+    try { return JSON.parse(fs.readFileSync(COURSES_FILE, "utf-8")); } catch { return []; }
+  }
+  function saveLocalCourses(data: any[]) {
+    try { fs.writeFileSync(COURSES_FILE, JSON.stringify(data, null, 2), "utf-8"); } catch (e) { console.error(e); }
+  }
+  function readLocalSessions(): any[] {
+    if (!fs.existsSync(SESSIONS_FILE)) return [];
+    try { return JSON.parse(fs.readFileSync(SESSIONS_FILE, "utf-8")); } catch { return []; }
+  }
+  function saveLocalSessions(data: any[]) {
+    try { fs.writeFileSync(SESSIONS_FILE, JSON.stringify(data, null, 2), "utf-8"); } catch (e) { console.error(e); }
+  }
+
+  // ===================== Courses & Lessons Endpoints =====================
+  app.get("/api/courses", async (_req, res) => {
+    try {
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          const snapshot = await admin.firestore().collection("courses").get();
+          const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          if (items.length > 0) return res.json({ success: true, courses: items });
+        } catch (e) {
+          console.warn("[API] Firestore courses get failed, falling back to local file:", e);
+        }
+      }
+      res.json({ success: true, courses: readLocalCourses() });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/courses", async (req, res) => {
+    try {
+      const courseData = req.body;
+      const courseId = courseData.id || `course_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      courseData.id = courseId;
+      courseData.createdAt = courseData.createdAt || new Date().toISOString();
+
+      let savedToFirestore = false;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          await admin.firestore().collection("courses").doc(courseId).set(courseData, { merge: true });
+          savedToFirestore = true;
+          console.log(`[API] Saved course to Firestore: ${courseId}`);
+        } catch (e) {
+          console.warn("[API] Firestore course save failed, saving locally:", e);
+        }
+      }
+
+      // Always save to local backup
+      const list = readLocalCourses();
+      const idx = list.findIndex(c => c.id === courseId);
+      if (idx >= 0) list[idx] = { ...list[idx], ...courseData };
+      else list.unshift(courseData);
+      saveLocalCourses(list);
+
+      res.json({ success: true, id: courseId, savedToFirestore, course: courseData });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.get("/api/sessions", async (req, res) => {
+    try {
+      const courseId = req.query.courseId as string;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          let ref: any = admin.firestore().collection("sessions");
+          if (courseId) ref = ref.where("courseId", "==", courseId);
+          const snapshot = await ref.get();
+          const items = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+          if (items.length > 0) return res.json({ success: true, sessions: items });
+        } catch (e) {
+          console.warn("[API] Firestore sessions get failed, falling back to local file:", e);
+        }
+      }
+      const list = readLocalSessions();
+      let filtered = courseId ? list.filter(s => s.courseId === courseId) : list;
+      if (courseId && filtered.length === 0 && list.length > 0) {
+        filtered = list;
+      }
+      res.json({ success: true, sessions: filtered });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.post("/api/sessions", async (req, res) => {
+    try {
+      const sessionData = req.body;
+      const sessionId = sessionData.id || `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      sessionData.id = sessionId;
+      sessionData.createdAt = sessionData.createdAt || new Date().toISOString();
+
+      let savedToFirestore = false;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          await admin.firestore().collection("sessions").doc(sessionId).set(sessionData, { merge: true });
+          savedToFirestore = true;
+          console.log(`[API] Saved session to Firestore: ${sessionId}`);
+        } catch (e) {
+          console.warn("[API] Firestore session save failed, saving locally:", e);
+        }
+      }
+
+      // Always save to local backup
+      const list = readLocalSessions();
+      const idx = list.findIndex(s => s.id === sessionId);
+      if (idx >= 0) list[idx] = { ...list[idx], ...sessionData };
+      else list.push(sessionData);
+      saveLocalSessions(list);
+
+      res.json({ success: true, id: sessionId, savedToFirestore, session: sessionData });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.get("/api/sessions/:id", async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          const docSnap = await admin.firestore().collection("sessions").doc(sessionId).get();
+          if (docSnap.exists) return res.json({ success: true, session: { id: docSnap.id, ...docSnap.data() } });
+        } catch (e) {
+          console.warn("[API] Firestore session get failed:", e);
+        }
+      }
+      const list = readLocalSessions();
+      const session = list.find(s => s.id === sessionId);
+      if (session) return res.json({ success: true, session });
+      res.status(404).json({ success: false, error: "Session not found" });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.delete("/api/courses/:id", async (req, res) => {
+    try {
+      const courseId = req.params.id;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          await admin.firestore().collection("courses").doc(courseId).delete();
+        } catch (e) {
+          console.warn("[API] Firestore course delete failed:", e);
+        }
+      }
+      const list = readLocalCourses();
+      const updated = list.filter(c => c.id !== courseId);
+      saveLocalCourses(updated);
+      res.json({ success: true, message: "Course deleted successfully" });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  app.delete("/api/sessions/:id", async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT && admin.apps.length > 0) {
+        try {
+          await admin.firestore().collection("sessions").doc(sessionId).delete();
+        } catch (e) {
+          console.warn("[API] Firestore session delete failed:", e);
+        }
+      }
+      const list = readLocalSessions();
+      const updated = list.filter(s => s.id !== sessionId);
+      saveLocalSessions(updated);
+      res.json({ success: true, message: "Session deleted successfully" });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+
   app.get("/api/test-ai", async (req, res) => {
     try {
       const apiKey = getApiKey();
       const genAI_old = new GoogleGenerativeAI(apiKey);
-      const testModel = genAI_old.getGenerativeModel({ model: "gemini-2.0-flash" }, { apiVersion: "v1beta" });
+      const testModel = genAI_old.getGenerativeModel({ model: "gemini-2.0-flash-lite" }, { apiVersion: "v1beta" });
       const testResult = await testModel.generateContent("Say hello in Arabic");
       res.json({ success: true, response: testResult.response.text() });
     } catch (error: any) {
@@ -321,11 +492,11 @@ ${context || "لا يوجد سياق متاح."}
 
 سؤال الطالب: ${question}`;
 
-      // Try full models first, then fall back to lite
+      // Try full models first, then fall back to lite and Gemma
       const MODELS = [
-        "gemini-2.0-flash",
         "gemini-1.5-flash",
-        "gemini-1.5-flash-8b"
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-pro"
       ];
       let kbResult: any = null;
       
@@ -405,9 +576,9 @@ ${kbContext ? `\nلديك المحتوى التعليمي التالي من قا
 
       // Try lite models first (separate quota pools), then standard models
       const MODELS = [
-        "gemini-2.0-flash",
         "gemini-1.5-flash",
-        "gemini-1.5-flash-8b"
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-pro"
       ];
       let lastError: any = null;
 
@@ -462,139 +633,6 @@ ${kbContext ? `\nلديك المحتوى التعليمي التالي من قا
     }
   });
 
-
-  // ===================== Course Restoration: إعادة إنشاء مقرر ريادة الأعمال الرقمية =====================
-  app.post("/api/restore-course", async (_req, res) => {
-    try {
-      // Use Firebase client SDK (already initialized) via Admin SDK if available
-      let courseId: string | null = null;
-      
-      if (admin.apps.length > 0) {
-        const firestore = admin.firestore();
-        const coursesRef = firestore.collection("courses");
-        
-        // Check if the course already exists
-        const existing = await coursesRef.where("title", "==", "ريادة الأعمال الرقمية").get();
-        if (!existing.empty) {
-          courseId = existing.docs[0].id;
-          res.json({ success: true, courseId, message: "المقرر موجود بالفعل", existed: true });
-          return;
-        }
-        
-        // Create the course
-        const courseData = {
-          title: "ريادة الأعمال الرقمية",
-          description: "مقرر ريادة الأعمال الرقمية - تنمية مهارات ريادة الأعمال الرقمية والاتجاه نحو العمل الحر لطلاب الجامعة",
-          category: "ريادة أعمال",
-          teacherName: "Dr Heba fadl",
-          teacherId: "",  // Will be linked by the teacher
-          rating: 5.0,
-          students: 0,
-          status: "published",
-          duration: "45 دقيقة",
-          courseCode: "DE2024",
-          imageUrl: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=800",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        };
-        
-        const newCourseRef = await coursesRef.add(courseData);
-        courseId = newCourseRef.id;
-        console.log(`[Restore] ✅ Created course: ${courseId}`);
-        
-        // Find orphaned sessions (sessions without courseId or with non-existent courseId)
-        const sessionsRef = firestore.collection("sessions");
-        const allSessions = await sessionsRef.get();
-        let linkedCount = 0;
-        
-        for (const sessionDoc of allSessions.docs) {
-          const sessionData = sessionDoc.data();
-          const sessionCourseId = sessionData.courseId;
-          
-          // Check if this session's courseId points to a non-existent course
-          if (sessionCourseId) {
-            const courseDoc = await coursesRef.doc(sessionCourseId).get();
-            if (!courseDoc.exists) {
-              // Orphaned session - link it to the new course
-              await sessionDoc.ref.update({ courseId: courseId });
-              linkedCount++;
-              console.log(`[Restore] Linked orphaned session ${sessionDoc.id} to course ${courseId}`);
-            }
-          } else {
-            // No courseId at all - link it
-            await sessionDoc.ref.update({ courseId: courseId });
-            linkedCount++;
-            console.log(`[Restore] Linked session ${sessionDoc.id} (no courseId) to course ${courseId}`);
-          }
-        }
-        
-        // Update student count based on enrolled users
-        const usersRef = firestore.collection("users");
-        const allUsers = await usersRef.where("role", "==", "student").get();
-        let studentCount = 0;
-        
-        for (const userDoc of allUsers.docs) {
-          const userData = userDoc.data();
-          const enrolled = userData.enrolledCourses || [];
-          // If student was enrolled in the old (deleted) course, enroll them in the new one
-          if (enrolled.length > 0) {
-            // Check if any enrolled course doesn't exist anymore
-            for (const enrolledId of enrolled) {
-              const courseDoc = await coursesRef.doc(enrolledId).get();
-              if (!courseDoc.exists) {
-                // Replace old course ID with new one
-                const newEnrolled = enrolled.map((id: string) => id === enrolledId ? courseId : id);
-                await userDoc.ref.update({ enrolledCourses: newEnrolled });
-                studentCount++;
-              }
-            }
-          }
-        }
-        
-        // Update student count on course
-        if (studentCount > 0) {
-          await newCourseRef.update({ students: studentCount });
-        }
-        
-        res.json({ 
-          success: true, 
-          courseId, 
-          message: `تم إنشاء المقرر وربط ${linkedCount} درس و${studentCount} طالب`, 
-          linkedSessions: linkedCount,
-          linkedStudents: studentCount
-        });
-      } else {
-        res.status(500).json({ success: false, error: "Firebase Admin not initialized" });
-      }
-    } catch (e: any) {
-      console.error("[Restore] Error:", e.message);
-      res.status(500).json({ success: false, error: e.message });
-    }
-  });
-
-  // Manual migration endpoint (rename existing courses)
-  app.post("/api/migrate-course", async (_req, res) => {
-    try {
-      if (admin.apps.length === 0) {
-        return res.json({ success: false, error: "Firebase Admin not initialized" });
-      }
-      const firestore = admin.firestore();
-      const coursesRef = firestore.collection("courses");
-      const snapshot = await coursesRef.where("title", "==", "مكملات الملابس").get();
-      let migratedCount = 0;
-      for (const docSnap of snapshot.docs) {
-        await docSnap.ref.update({
-          title: "ريادة الأعمال الرقمية",
-          description: "مقرر ريادة الأعمال الرقمية - تنمية مهارات ريادة الأعمال الرقمية والاتجاه نحو العمل الحر لطلاب الجامعة",
-          category: "ريادة أعمال",
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        migratedCount++;
-      }
-      res.json({ success: true, migrated: migratedCount });
-    } catch (e: any) {
-      res.status(500).json({ success: false, error: e.message });
-    }
-  });
 
   // ===================== Vite Middleware / Static =====================
   async function startServer() {

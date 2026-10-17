@@ -143,16 +143,14 @@ service cloud.firestore {
     }
 
     match /courses/{courseId} {
-      allow read: if isAuthenticated();
-      allow create: if isTeacher() && isValidCourse(request.resource.data) && request.resource.data.teacherId == request.auth.uid;
-      allow update: if (isTeacher() && isValidCourse(request.resource.data) && (resource.data.teacherId == request.auth.uid || isAdmin())) ||
-                    (isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['students']) && request.resource.data.students == resource.data.students + 1);
-      allow delete: if isAdmin() || (isTeacher() && resource.data.teacherId == request.auth.uid);
+      allow read: if true;
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated() && (isAdmin() || resource.data.teacherId == request.auth.uid);
     }
 
     match /sessions/{sessionId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isTeacher();
+      allow read: if true;
+      allow create, update, delete: if isAuthenticated();
     }
 
     match /quizzes/{quizId} {

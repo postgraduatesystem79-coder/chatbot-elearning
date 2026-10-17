@@ -29,8 +29,8 @@ export function ChatbotPage() {
     if (messages.length === 0) {
       const userName = profile?.displayName || profile?.name || '';
       const arWelcome = userName 
-        ? `مرحباً دكتورة/أستاذة ${userName}! أنا مساعدك الذكي في بيئة التعلم الإلكترونية لتنمية مهارات ريادة الأعمال الرقمية بكلية التربية النوعية. كيف يمكنني مساعدتك اليوم؟`
-        : `مرحباً بك! أنا مساعدك الذكي في بيئة التعلم الإلكترونية لتنمية مهارات ريادة الأعمال الرقمية بكلية التربية النوعية. كيف يمكنني مساعدتك اليوم؟`;
+        ? `مرحباً دكتورة/أستاذة ${userName}! أنا مساعدك الذكي في بيئة التعلم الإلكترونية لتنمية الوعي الصحي لاختيار مكملات الملابس. كيف يمكنني مساعدتك اليوم؟`
+        : `مرحباً بك! أنا مساعدك الذكي في بيئة التعلم الإلكترونية لتنمية الوعي الصحي لاختيار مكملات الملابس. كيف يمكنني مساعدتك اليوم؟`;
       
       const enWelcome = userName
         ? `Hello ${userName}! I am your smart assistant in the E-Learning environment at the Faculty of Specific Education. How can I help you today?`

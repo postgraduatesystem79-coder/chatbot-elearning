@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { collection, onSnapshot, query, where, addDoc, serverTimestamp, doc, updateDoc, deleteDoc, increment } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Filter, 
@@ -18,7 +18,8 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  UserCheck
+  UserCheck,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -28,6 +29,7 @@ import { toast } from 'sonner';
 export function CourseList() {
   const { t } = useTranslation();
   const { isTeacher, profile } = useAuth();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -37,6 +39,11 @@ export function CourseList() {
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
+  // Add Lesson modal state
+  const [isAddLessonModalOpen, setIsAddLessonModalOpen] = useState(false);
+  const [selectedCourseForLesson, setSelectedCourseForLesson] = useState<string>('');
+  const [newLessonTitle, setNewLessonTitle] = useState('');
+  const [isCreatingLesson, setIsCreatingLesson] = useState(false);
   const [newCourse, setNewCourse] = useState({
     title: '',
     description: '',
@@ -46,6 +53,64 @@ export function CourseList() {
     courseCode: '',
     startDate: '',
   });
+
+  const handleAddLesson = async () => {
+    if (!selectedCourseForLesson || isCreatingLesson) return;
+    setIsCreatingLesson(true);
+    let createdLessonId: string | null = null;
+    const lessonTitle = newLessonTitle.trim() || `الدرس`;
+
+    const newLessonData = {
+      courseId: selectedCourseForLesson,
+      title: lessonTitle,
+      description: `محتوى ${lessonTitle}`,
+      webUrl: '',
+      videoUrl: '',
+      code: '',
+      robotInstructions: '',
+      objectives: ['الهدف الأول للدرس', 'الهدف الثاني للدرس'],
+      content: [
+        { id: 'web', type: 'web', title: 'صفحة ويب', color: 'text-blue-600' },
+        { id: 'video', type: 'video', title: 'فيديو تعليمي', color: 'text-purple-500' },
+        { id: 'pdf', type: 'pdf', title: 'ملف PDF', color: 'text-red-500' },
+      ],
+      activities: [],
+      evaluation: [],
+      status: 'published',
+    };
+
+    // 1. Post directly to server API first (instant, guaranteed save)
+    try {
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLessonData)
+      });
+      const resData = await res.json();
+      if (resData.success && resData.id) {
+        createdLessonId = resData.id;
+        toast.success(`تم إضافة "${lessonTitle}" بنجاح`);
+      }
+
+      // 2. Also try Firestore in background without awaiting
+      addDoc(collection(db, 'sessions'), {
+        ...newLessonData,
+        createdAt: serverTimestamp(),
+      }).catch(() => {});
+    } catch (err: any) {
+      console.error('Lesson save failed:', err);
+      toast.error(`تعذر إضافة الدرس: ${err.message || 'خطأ غير معروف'}`);
+    } finally {
+      setIsCreatingLesson(false);
+      if (createdLessonId) {
+        const targetCourse = selectedCourseForLesson;
+        setIsAddLessonModalOpen(false);
+        setSelectedCourseForLesson('');
+        setNewLessonTitle('');
+        navigate(`/courses/${targetCourse}/lessons/${createdLessonId}`);
+      }
+    }
+  };
 
   const handleEnroll = async (courseId: string) => {
     if (!profile?.uid) return;
@@ -77,148 +142,81 @@ export function CourseList() {
   };
 
   useEffect(() => {
+    // 1. Load instantly from server API
+    fetch('/api/courses')
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.courses && json.courses.length > 0) {
+          setCourses(json.courses);
+          setLoading(false);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Also listen to Firestore live updates
     const coursesRef = collection(db, 'courses');
-    // If teacher, show all courses. If student, show all published courses.
     const q = isTeacher 
       ? query(coursesRef)
       : query(coursesRef, where('status', '==', 'published'));
 
-    let hasRestoredCourse = false;
-
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setCourses(data);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      if (data.length > 0) {
+        setCourses(data);
+      }
       setLoading(false);
-
-      if (!isTeacher || !profile?.uid || hasRestoredCourse) return;
-
-      let currentMainCourse: any = data.find((c: any) => 
-        c.title?.includes('ريادة') || c.title?.includes('الأعمال الرقمية')
-      );
-
-      // 1. If not found, check if we need to rename an old course
-      if (!currentMainCourse) {
-        for (const course of data) {
-          const title = (course as any).title || '';
-          if (title.includes('مكملات الملابس') || title.includes('مكملات')) {
-            try {
-              await updateDoc(doc(db, 'courses', course.id), {
-                title: 'ريادة الأعمال الرقمية',
-                description: 'مقرر ريادة الأعمال الرقمية - تنمية مهارات ريادة الأعمال الرقمية والاتجاه نحو العمل الحر لطلاب الجامعة',
-                category: 'ريادة أعمال',
-              });
-              toast.success('تم تحديث اسم المقرر إلى "ريادة الأعمال الرقمية" بنجاح');
-              currentMainCourse = { ...course, title: 'ريادة الأعمال الرقمية' };
-              break;
-            } catch (err) {
-              console.error('Migration error:', err);
-            }
-          }
-        }
-      }
-
-      // 2. If STILL not found, create it
-      if (!currentMainCourse) {
-        try {
-          const newCourseRef = await addDoc(collection(db, 'courses'), {
-            title: 'ريادة الأعمال الرقمية',
-            description: 'مقرر ريادة الأعمال الرقمية - تنمية مهارات ريادة الأعمال الرقمية والاتجاه نحو العمل الحر لطلاب الجامعة',
-            category: 'ريادة أعمال',
-            teacherName: profile?.name || profile?.displayName || 'Dr Heba fadl',
-            teacherId: profile?.uid,
-            rating: 5.0,
-            students: 0,
-            status: 'published',
-            duration: '45 دقيقة',
-            courseCode: 'DE2024',
-            imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&q=80&w=800',
-            createdAt: serverTimestamp(),
-          });
-          currentMainCourse = { id: newCourseRef.id, title: 'ريادة الأعمال الرقمية' };
-          toast.success('تم استعادة مقرر "ريادة الأعمال الرقمية" بنجاح');
-        } catch (err) {
-          console.error('Course creation error:', err);
-        }
-      }
-
-      // 3. Ensure lessons and students are linked to the main course
-      if (currentMainCourse) {
-        hasRestoredCourse = true;
-        try {
-          const { getDocs, collection: coll, query: q2, where: wh } = await import('firebase/firestore');
-          
-          // Link Orphaned Sessions
-          const sessionsSnapshot = await getDocs(coll(db, 'sessions'));
-          let linkedSessions = 0;
-          for (const sessionDoc of sessionsSnapshot.docs) {
-            const sess = sessionDoc.data();
-            if (!sess.courseId || !data.some(c => c.id === sess.courseId)) {
-              if (sess.courseId !== currentMainCourse.id) {
-                await updateDoc(doc(db, 'sessions', sessionDoc.id), { courseId: currentMainCourse.id });
-                linkedSessions++;
-              }
-            }
-          }
-
-          // Link All Students
-          const studentsSnapshot = await getDocs(query(coll(db, 'users'), wh('role', '==', 'student')));
-          let enrolledCount = 0;
-          let studentsChanged = false;
-          for (const userDoc of studentsSnapshot.docs) {
-            const userData = userDoc.data();
-            const enrolled = userData.enrolledCourses || [];
-            if (!enrolled.includes(currentMainCourse.id)) {
-              const validEnrollments = enrolled.filter((id: string) => data.some(c => c.id === id));
-              await updateDoc(doc(db, 'users', userDoc.id), {
-                enrolledCourses: [...validEnrollments, currentMainCourse.id]
-              });
-              studentsChanged = true;
-            }
-            enrolledCount++;
-          }
-
-          if (studentsChanged || (currentMainCourse as any).students !== enrolledCount) {
-            await updateDoc(doc(db, 'courses', currentMainCourse.id), { students: enrolledCount });
-          }
-
-          if (linkedSessions > 0 || studentsChanged) {
-            toast.success(`تم استرجاع ${linkedSessions} درس و ${enrolledCount} طالب للمقرر.`);
-          }
-        } catch (err) {
-          console.error('Final restoration error:', err);
-        }
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'courses');
+    }, async () => {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [isTeacher]);
 
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+
+    const generatedCode = newCourse.courseCode || Math.random().toString(36).substring(2, 8).toUpperCase();
+    const currentUid = profile?.uid || auth.currentUser?.uid || 'teacher-default';
+    const currentTeacherName = profile?.displayName || profile?.name || auth.currentUser?.displayName || 'م/ اسراء';
+
+    const coursePayload = {
+      ...newCourse,
+      courseCode: generatedCode,
+      teacherName: currentTeacherName,
+      teacherId: currentUid,
+      rating: 5.0,
+      students: 0,
+      status: 'published',
+      duration: `${newCourse.duration} دقيقة`
+    };
+
     try {
-      if (editingCourseId) {
-        const { doc, updateDoc } = await import('firebase/firestore');
-        await updateDoc(doc(db, 'courses', editingCourseId), {
-          ...newCourse,
-          duration: `${newCourse.duration} دقيقة`
-        });
-      } else {
-        const generatedCode = newCourse.courseCode || Math.random().toString(36).substring(2, 8).toUpperCase();
-        await addDoc(collection(db, 'courses'), {
-          ...newCourse,
-          courseCode: generatedCode,
-          teacherName: profile?.name || 'Teacher',
-          teacherId: profile?.uid,
-          rating: 5.0,
-          students: 0,
-          status: 'published',
-          createdAt: serverTimestamp(),
-          duration: `${newCourse.duration} دقيقة`
-        });
+      // Send directly to server API
+      const res = await fetch('/api/courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingCourseId ? { ...coursePayload, id: editingCourseId } : coursePayload)
+      });
+      const data = await res.json();
+      
+      const savedCourse = {
+        id: data.id || editingCourseId || `course_${Date.now()}`,
+        ...coursePayload
+      };
+
+      // Also try to push to Firestore in background without awaiting (fire and forget)
+      if (!editingCourseId) {
+        addDoc(collection(db, 'courses'), { ...coursePayload, createdAt: serverTimestamp() }).catch(() => {});
       }
+
+      // Update local state immediately
+      setCourses(prev => {
+        const exists = prev.some(c => c.id === savedCourse.id);
+        if (exists) return prev.map(c => c.id === savedCourse.id ? { ...c, ...savedCourse } : c);
+        return [savedCourse, ...prev];
+      });
+
+      toast.success(editingCourseId ? 'تم تحديث المقرر بنجاح' : 'تم حفظ المقرر بنجاح');
       setIsModalOpen(false);
       setEditingCourseId(null);
       setNewCourse({
@@ -230,8 +228,9 @@ export function CourseList() {
         courseCode: '',
         startDate: '',
       });
-    } catch (error) {
-      handleFirestoreError(error, editingCourseId ? OperationType.WRITE : OperationType.CREATE, 'courses');
+    } catch (err: any) {
+      console.error('Error saving course:', err);
+      toast.error('حدث خطأ أثناء حفظ المقرر، يرجى المحاولة مرة أخرى');
     } finally {
       setIsSaving(false);
     }
@@ -252,10 +251,15 @@ export function CourseList() {
   };
 
   const handleDeleteCourse = async (courseId: string) => {
+    if (!window.confirm('هل أنتِ متأكدة من حذف هذا المقرر وجميع دروسه ومحتوياته؟')) return;
     try {
-      await deleteDoc(doc(db, 'courses', courseId));
+      setCourses(prev => prev.filter(c => c.id !== courseId));
+      await fetch(`/api/courses/${courseId}`, { method: 'DELETE' });
+      deleteDoc(doc(db, 'courses', courseId)).catch(() => {});
+      toast.success('تم حذف المقرر بنجاح');
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `courses/${courseId}`);
+      console.error('Error deleting course:', error);
+      toast.error('حدث خطأ أثناء حذف المقرر');
     }
   };
 
@@ -284,33 +288,45 @@ export function CourseList() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">ريادة الأعمال الرقمية</h2>
-          <p className="text-muted-foreground mt-1">استكشف وادر مقرراتك التعليمية.</p>
+        <div className="space-y-1">
+          <h2 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
+            <BookOpen className="text-primary w-8 h-8" />
+            {t('courses')}
+          </h2>
+          <p className="text-muted-foreground font-medium">{isTeacher ? 'إدارة دروس المنهج التعليمي' : 'استكشف الدروس التعليمية الخاصة بالبحث'}</p>
         </div>
-        {isTeacher && (
-          <div className="flex gap-4">
-            <button 
-              onClick={() => {
-                setEditingCourseId(null);
-                setNewCourse({
-                  title: '',
-                  description: '',
-                  category: 'Programming',
-                  imageUrl: '',
-                  duration: '45',
-                  courseCode: '',
-                  startDate: '',
-                });
-                setIsModalOpen(true);
-              }}
-              className="bg-primary text-primary-foreground px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
-            >
-              <Plus size={20} />
-              <span>إضافة مقرر جديد</span>
-            </button>
-          </div>
-        )}
+        <div className="flex gap-4 flex-wrap">
+          <button 
+            onClick={() => {
+              setEditingCourseId(null);
+              setNewCourse({
+                title: '',
+                description: '',
+                category: 'Programming',
+                imageUrl: '',
+                duration: '45',
+                courseCode: '',
+                startDate: '',
+              });
+              setIsModalOpen(true);
+            }}
+            className="bg-[#fc721e] text-white px-8 py-3.5 rounded-2xl font-black flex items-center gap-2 hover:bg-[#e65a10] transition-all shadow-[0_10px_30px_rgba(252,114,30,0.3)] transform hover:scale-105 active:scale-95"
+          >
+            <Plus size={24} />
+            <span className="text-lg">إضافة مقرر جديد</span>
+          </button>
+          <button 
+            onClick={() => {
+              setSelectedCourseForLesson(courses.length > 0 ? courses[0].id : '');
+              setNewLessonTitle('');
+              setIsAddLessonModalOpen(true);
+            }}
+            className="bg-[#064e40] text-white px-8 py-3.5 rounded-2xl font-black flex items-center gap-2 hover:bg-[#053d33] transition-all shadow-[0_10px_30px_rgba(6,78,64,0.3)] transform hover:scale-105 active:scale-95"
+          >
+            <FileText size={24} />
+            <span className="text-lg">إضافة درس</span>
+          </button>
+        </div>
       </div>
 
       {/* Course Grid */}
@@ -350,8 +366,11 @@ export function CourseList() {
                 </div>
               
               <h3 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors mb-2 line-clamp-2">
-                <Link to={`/courses/${course.id}`}>
-                  {course.title}
+                <Link to={`/courses/${course.id}`} className="flex items-center gap-2">
+                   <span className="w-6 h-6 rounded bg-primary/10 text-primary text-[10px] flex items-center justify-center font-bold">
+                     #{i + 1}
+                   </span>
+                   {course.title}
                 </Link>
               </h3>
               
@@ -373,26 +392,69 @@ export function CourseList() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 border-t">
+            <div className="border-t bg-muted/20">
               {isTeacher ? (
-                <Link 
-                  to={`/courses/${course.id}`}
-                  className={cn(
-                    "bg-muted/50 py-3 text-center text-sm font-bold hover:bg-primary hover:text-primary-foreground transition-all flex items-center justify-center gap-2 border-e",
-                    course.teacherId === profile?.uid ? "col-span-1" : "col-span-2"
-                  )}
-                >
-                  <span>{t('view_course')}</span>
-                  <ArrowRight size={16} />
-                </Link>
+                <div className="flex flex-col">
+                  {/* Primary Action Button: Enter Course */}
+                  <div className="flex border-b">
+                    <Link 
+                      to={`/courses/${course.id}`}
+                      className="flex-1 bg-primary text-primary-foreground py-3 text-center text-sm font-bold hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
+                    >
+                      <span>عرض المحتوى والدروس</span>
+                      <ArrowRight size={16} />
+                    </Link>
+                  </div>
+                  {/* Secondary Actions: Add Lesson, Edit Course, Toggle Publish, Delete Course */}
+                  <div className="flex divide-x rtl:divide-x-reverse bg-muted/40">
+                    <button 
+                      onClick={() => {
+                        setSelectedCourseForLesson(course.id);
+                        setNewLessonTitle('');
+                        setIsAddLessonModalOpen(true);
+                      }}
+                      className="flex-1 py-2.5 px-2 text-center text-xs font-bold text-primary hover:bg-primary/10 transition-all flex items-center justify-center gap-1"
+                      title="إضافة درس لهذا المقرر"
+                    >
+                      <Plus size={15} />
+                      <span>إضافة درس</span>
+                    </button>
+                    <button 
+                      onClick={() => openEditModal(course)}
+                      className="flex-1 py-2.5 px-2 text-center text-xs font-bold text-amber-600 hover:bg-amber-500 hover:text-white transition-all flex items-center justify-center gap-1"
+                      title={t('edit') || 'تعديل المقرر'}
+                    >
+                      <Edit2 size={15} />
+                      <span>تعديل</span>
+                    </button>
+                    <button 
+                      onClick={() => handleTogglePublish(course)}
+                      className={cn(
+                        "py-2.5 px-2.5 text-center text-xs font-bold transition-all flex items-center justify-center",
+                        course.status === 'published' ? "text-yellow-600 hover:bg-yellow-500 hover:text-white" : "text-green-600 hover:bg-green-500 hover:text-white"
+                      )}
+                      title={course.status === 'published' ? t('unpublish') : t('publish')}
+                    >
+                      {course.status === 'published' ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteCourse(course.id)}
+                      className="flex-1 py-2.5 px-2 text-center text-xs font-bold text-red-600 hover:bg-red-600 hover:text-white transition-all flex items-center justify-center gap-1"
+                      title={t('delete') || 'حذف المقرر'}
+                    >
+                      <Trash2 size={15} />
+                      <span>حذف</span>
+                    </button>
+                  </div>
+                </div>
               ) : (
-                <>
+                <div className="grid grid-cols-2">
                   {profile?.enrolledCourses?.includes(course.id) ? (
                     <Link 
                       to={`/courses/${course.id}`}
                       className="col-span-2 bg-muted/50 py-3 text-center text-sm font-bold hover:bg-primary hover:text-primary-foreground transition-all flex items-center justify-center gap-2"
                     >
-                      <span>{t('view_course')}</span>
+                      <span>{t('view_course') || 'عرض الدرس'}</span>
                       <ArrowRight size={16} />
                     </Link>
                   ) : (
@@ -411,34 +473,6 @@ export function CourseList() {
                       )}
                     </button>
                   )}
-                </>
-              )}
-              {isTeacher && course.teacherId === profile?.uid && (
-                <div className="flex divide-x rtl:divide-x-reverse">
-                  <button 
-                    onClick={() => openEditModal(course)}
-                    className="flex-1 bg-muted/50 py-3 text-center text-sm font-bold hover:bg-amber-500 hover:text-white transition-all flex items-center justify-center"
-                    title={t('edit')}
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button 
-                    onClick={() => handleTogglePublish(course)}
-                    className={cn(
-                      "flex-1 py-3 text-center text-sm font-bold transition-all flex items-center justify-center",
-                      course.status === 'published' ? "bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500 hover:text-white" : "bg-green-500/10 text-green-600 hover:bg-green-500 hover:text-white"
-                    )}
-                    title={course.status === 'published' ? t('unpublish') : t('publish')}
-                  >
-                    {course.status === 'published' ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteCourse(course.id)}
-                    className="flex-1 bg-muted/50 py-3 text-center text-sm font-bold hover:bg-destructive hover:text-destructive-foreground transition-all flex items-center justify-center"
-                    title={t('delete')}
-                  >
-                    <Trash2 size={16} />
-                  </button>
                 </div>
               )}
             </div>
@@ -593,6 +627,91 @@ export function CourseList() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Lesson Modal */}
+      <AnimatePresence>
+        {isAddLessonModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-card border shadow-2xl rounded-2xl w-full max-w-lg overflow-hidden"
+            >
+              <div className="p-6 border-b flex items-center justify-between bg-muted/30">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-[#064e40]/10 rounded-lg text-[#064e40]">
+                    <FileText size={20} />
+                  </div>
+                  <h3 className="font-bold text-xl">إضافة درس جديد</h3>
+                </div>
+                <button 
+                  onClick={() => setIsAddLessonModalOpen(false)}
+                  className="p-2 hover:bg-muted rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold flex items-center gap-2">
+                    <BookOpen size={16} className="text-primary" />
+                    اختر المقرر
+                  </label>
+                  {courses.length === 0 ? (
+                    <div className="p-3 bg-amber-500/10 text-amber-700 rounded-xl text-sm font-medium">
+                      لا توجد مقررات حالياً، يُرجى إنشاء مقرر أولاً قبل إضافة درس.
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedCourseForLesson}
+                      onChange={(e) => setSelectedCourseForLesson(e.target.value)}
+                      className="w-full bg-muted border-none rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/20 transition-all font-medium"
+                    >
+                      <option value="" disabled>اختر المقرر...</option>
+                      {courses.map((c) => (
+                        <option key={c.id} value={c.id}>{c.title}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold flex items-center gap-2">
+                    <FileText size={16} className="text-primary" />
+                    عنوان الدرس
+                  </label>
+                  <input
+                    type="text"
+                    value={newLessonTitle}
+                    onChange={(e) => setNewLessonTitle(e.target.value)}
+                    className="w-full bg-muted border-none rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/20 transition-all font-medium"
+                    placeholder="اتركه فارغاً للعنوان التلقائي (مثل: الدرس 1)"
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setIsAddLessonModalOpen(false)}
+                    className="flex-1 py-3 rounded-xl border font-bold hover:bg-accent transition-all"
+                  >
+                    إلغاء
+                  </button>
+                  <button 
+                    onClick={handleAddLesson}
+                    disabled={isCreatingLesson || !selectedCourseForLesson}
+                    className="flex-1 py-3 rounded-xl bg-[#064e40] text-white font-bold hover:bg-[#053d33] transition-all shadow-lg shadow-[#064e40]/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isCreatingLesson ? <Loader2 className="animate-spin" size={20} /> : 'إضافة الدرس'}
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}

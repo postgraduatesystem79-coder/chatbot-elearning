@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, limit, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../lib/useAuth';
 import { 
@@ -217,8 +217,17 @@ function AttachMenu({ onClose }: { onClose: () => void }) {
 }
 
 /** قائمة المزيد (MoreVertical) */
-function MoreMenu({ onClose }: { onClose: () => void }) {
-  const items = ['مسح الرسائل (أنت فقط)', 'تعطيل الإشعارات', 'وصف المجموعة', 'إضافة مشارك'];
+function MoreMenu({ onClose, onClear }: { onClose: () => void; onClear?: () => void }) {
+  const { t } = useTranslation();
+  const items = [
+    { label: 'تعطيل الإشعارات', action: onClose },
+    { label: 'وصف المجموعة', action: onClose },
+  ];
+
+  if (onClear) {
+    items.unshift({ label: 'مسح سجل الدردشة للجميع', action: onClear });
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9, y: -5 }}
@@ -228,11 +237,14 @@ function MoreMenu({ onClose }: { onClose: () => void }) {
     >
       {items.map(item => (
         <button
-          key={item}
-          onClick={onClose}
-          className="block w-full text-start px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+          key={item.label}
+          onClick={() => { item.action(); onClose(); }}
+          className={cn(
+            "block w-full text-start px-4 py-2.5 text-sm hover:bg-slate-50 transition-colors",
+            item.label.includes('مسح') ? "text-red-600 font-bold" : "text-slate-700"
+          )}
         >
-          {item}
+          {item.label}
         </button>
       ))}
     </motion.div>
@@ -329,6 +341,24 @@ export default function ChatRoom() {
     }
   };
 
+  const clearChatHistory = async () => {
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'teacher')) return;
+    if (!window.confirm('هل أنت متأكد من مسح كافة الرسائل؟ هذا الإجراء لا يمكن التراجع عنه.')) return;
+    
+    try {
+      const q = query(collection(db, 'chat_messages'));
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+      toast.success('تم مسح السجل بنجاح');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'chat_messages');
+    }
+  };
+
   if (!profile) return null;
 
   return (
@@ -406,7 +436,12 @@ export default function ChatRoom() {
               <MoreVertical size={20} />
             </motion.button>
             <AnimatePresence>
-              {showMore && <MoreMenu onClose={() => setShowMore(false)} />}
+              {showMore && (
+                <MoreMenu 
+                  onClose={() => setShowMore(false)} 
+                  onClear={(profile.role === 'admin' || profile.role === 'teacher') ? clearChatHistory : undefined} 
+                />
+              )}
             </AnimatePresence>
           </div>
         </div>
@@ -423,170 +458,194 @@ export default function ChatRoom() {
         )}
       </AnimatePresence>
 
-      {/* ===== Messages Area ===== */}
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 custom-scrollbar relative"
-        style={{
-          backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")',
-          backgroundOpacity: 0.06
-        }}
-      >
-        <div className="flex justify-center mb-4">
-          <span className="bg-[#d1f4ff] text-[#54656f] text-[11px] font-bold px-3 py-1 rounded-lg uppercase tracking-wider shadow-sm">
-            اليوم
-          </span>
-        </div>
+      {/* ===== Chat Layout (Main Area + Sidebar) ===== */}
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* Messages Area */}
+        <div className="flex-1 flex flex-col min-w-0 bg-[#efeae2] relative overflow-hidden">
+          <div 
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 custom-scrollbar relative"
+            style={{
+              backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")',
+              backgroundOpacity: 0.06
+            }}
+          >
+            <div className="flex justify-center mb-4">
+              <span className="bg-[#d1f4ff] text-[#54656f] text-[11px] font-bold px-3 py-1 rounded-lg uppercase tracking-wider shadow-sm">
+                اليوم
+              </span>
+            </div>
 
-        {loading && (
-          <div className="flex justify-center py-8">
-            <div className="w-8 h-8 border-4 border-[#00a884] border-t-transparent rounded-full animate-spin" />
+            {loading && (
+              <div className="flex justify-center py-8">
+                <div className="w-8 h-8 border-4 border-[#00a884] border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+
+            <AnimatePresence initial={false}>
+              {messages.map((msg, i) => {
+                const isMe = msg.senderId === profile.uid;
+                const time = msg.createdAt?.seconds 
+                  ? format(new Date(msg.createdAt.seconds * 1000), 'p', { locale: i18n.language === 'ar' ? ar : enUS })
+                  : format(new Date(), 'p');
+                const isHighlighted = highlightedIds.includes(msg.id || '');
+
+                return (
+                  <motion.div
+                    key={msg.id || i}
+                    layout
+                    initial={{ opacity: 0, scale: 0.8, x: isMe ? 20 : -20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+                    className={cn(
+                      "flex flex-col mb-2",
+                      isMe ? "items-end ml-4 md:ml-12" : "items-start mr-4 md:mr-12"
+                    )}
+                  >
+                    <div className={cn(
+                      "relative max-w-full px-3 py-1.5 rounded-2xl shadow-sm min-w-[80px] transition-all duration-300",
+                      isMe 
+                        ? "bg-[#e7ffdb] text-[#111b21] rounded-tr-none" 
+                        : "bg-white text-[#111b21] rounded-tl-none",
+                      isHighlighted && "ring-2 ring-yellow-400 ring-offset-1 shadow-yellow-200 shadow-lg"
+                    )}>
+                      {/* Bubble Tail SVG */}
+                      <div className={cn(
+                        "absolute top-0 w-3 h-4",
+                        isMe 
+                          ? "-right-2 text-[#e7ffdb]" 
+                          : "-left-2 text-white"
+                      )}>
+                        <svg viewBox="0 0 8 13" className="w-full h-full fill-current">
+                          <path d={isMe ? "M1.533 3.568L8 12.193V1H2.812C1.042 1 .474 2.156 1.533 3.568z" : "M6.467 3.568L0 12.193V1H5.188C6.958 1 7.526 2.156 6.467 3.568z"} />
+                        </svg>
+                      </div>
+
+                      {!isMe && (
+                        <p className="text-[10px] font-black text-primary mb-0.5 opacity-80 uppercase tracking-tighter">
+                          {msg.senderName} • {msg.senderRole === 'teacher' ? 'معلم' : 'طالب'}
+                        </p>
+                      )}
+                      
+                      <p className="text-[13px] md:text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                      
+                      <div className="flex items-center justify-end gap-1 mt-0.5 opacity-50">
+                        <span className="text-[9px] font-medium">{time}</span>
+                        {isMe && <CheckCheck size={12} className="text-[#53bdeb]" />}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
-        )}
 
-        <AnimatePresence initial={false}>
-          {messages.map((msg, i) => {
-            const isMe = msg.senderId === profile.uid;
-            const time = msg.createdAt?.seconds 
-              ? format(new Date(msg.createdAt.seconds * 1000), 'p', { locale: i18n.language === 'ar' ? ar : enUS })
-              : format(new Date(), 'p');
-            const isHighlighted = highlightedIds.includes(msg.id || '');
-
-            return (
-              <motion.div
-                key={msg.id || i}
-                layout
-                initial={{ opacity: 0, scale: 0.8, x: isMe ? 20 : -20 }}
-                animate={{ opacity: 1, scale: 1, x: 0 }}
-                transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          {/* Input Area (Integrated into message-pane-col for proper z-index) */}
+          <div ref={inputAreaRef} className="bg-[#f0f2f5] p-3 flex items-center gap-2 border-t relative">
+            {/* Same Input logic from before... but now within the flex-col */}
+            {/* [EMOJI & ATTACH LOGIC KEPT] */}
+            <AnimatePresence>
+              {showEmoji && (
+                <EmojiPicker
+                  onSelect={em => setNewMessage(m => m + em)}
+                  onClose={() => setShowEmoji(false)}
+                />
+              )}
+            </AnimatePresence>
+            <AnimatePresence>
+              {showAttach && (
+                <AttachMenu onClose={() => setShowAttach(false)} />
+              )}
+            </AnimatePresence>
+            <motion.button
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => { setShowEmoji(e => !e); setShowAttach(false); }}
+              className={cn(
+                "p-2 rounded-full transition-colors flex-shrink-0",
+                showEmoji ? "text-[#00a884] bg-[#00a884]/10" : "text-slate-500 hover:text-slate-700 hover:bg-black/5"
+              )}
+            >
+              <Smile size={24} />
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => { setShowAttach(a => !a); setShowEmoji(false); }}
+              className={cn(
+                "p-2 rounded-full transition-colors flex-shrink-0",
+                showAttach ? "text-[#00a884] bg-[#00a884]/10" : "text-slate-500 hover:text-slate-700 hover:bg-black/5"
+              )}
+            >
+              <Paperclip size={22} />
+            </motion.button>
+            <form onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={e => setNewMessage(e.target.value)}
+                onFocus={() => { setShowEmoji(false); setShowAttach(false); }}
+                placeholder="اكتب رسالتك هنا..."
+                className="flex-1 bg-white border-none rounded-xl px-4 py-2.5 text-sm text-slate-900 outline-none focus:ring-0 shadow-sm"
+              />
+              <motion.button 
+                type="submit"
+                disabled={!newMessage.trim()}
                 className={cn(
-                  "flex flex-col max-w-[85%] md:max-w-[70%]",
-                  isMe ? "ms-auto items-end" : "me-auto items-start"
+                  "w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-md flex-shrink-0",
+                  newMessage.trim() ? "bg-[#00a884] text-white" : "bg-slate-300 text-slate-500"
                 )}
               >
-                <span className={cn(
-                  "text-[11px] font-bold mb-1 px-2",
-                  isMe ? "text-emerald-600" : "text-primary"
-                )}>
-                  {msg.senderName} 
-                  <span className="text-[9px] bg-black/5 px-1 rounded ms-1 font-medium opacity-70">
-                    {msg.senderRole === 'teacher' ? 'معلم' : 'طالب'}
-                  </span>
-                </span>
-                <div className={cn(
-                  "relative p-2 px-3 rounded-xl shadow-sm min-w-[80px] transition-all duration-300",
-                  isMe 
-                    ? "bg-[#d9fdd3] text-[#111b21] rounded-te-none" 
-                    : "bg-white text-[#111b21] rounded-ts-none",
-                  isHighlighted && "ring-2 ring-yellow-400 ring-offset-1 shadow-yellow-200 shadow-lg"
-                )}>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap pb-2">{msg.text}</p>
-                  <div className="flex items-center justify-end gap-1 mt-1">
-                    <span className="text-[9px] text-[#667781]">{time}</span>
-                    {isMe && <CheckCheck size={12} className="text-[#53bdeb]" />}
-                  </div>
-                  
-                  {/* Message Tail */}
-                  <div className={cn(
-                    "absolute top-0 w-3 h-3",
-                    isMe 
-                      ? "-right-2 bg-[#d9fdd3] [clip-path:polygon(0_0,0_100%,100%_0)]" 
-                      : "-left-2 bg-white [clip-path:polygon(100%_0,100%_100%,0_0)]"
-                  )} />
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
+                <Send size={20} className={cn(i18n.language === 'ar' && "rotate-180")} />
+              </motion.button>
+            </form>
+          </div>
+        </div>
 
-      {/* ===== Scroll to Bottom Button ===== */}
-      <AnimatePresence>
-        {showScrollBtn && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            onClick={scrollToBottom}
-            className="absolute bottom-20 end-4 z-20 w-10 h-10 bg-white border shadow-lg rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors"
-            title="انتقل للأسفل"
-          >
-            <ChevronDown size={20} />
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      {/* ===== Input Area ===== */}
-      <div ref={inputAreaRef} className="bg-[#f0f2f5] p-3 flex items-center gap-2 border-t relative">
-        
-        {/* Emoji Picker */}
+        {/* ===== WhatsApp Style Sidebar (Group Info) ===== */}
         <AnimatePresence>
-          {showEmoji && (
-            <EmojiPicker
-              onSelect={em => setNewMessage(m => m + em)}
-              onClose={() => setShowEmoji(false)}
-            />
-          )}
+           {/* Sidebar can be toggled by Clicking "غرفة الدردشة الجماعية" in header - Simplified logic here */}
+           <motion.aside
+             initial={{ width: 0, opacity: 0 }}
+             animate={{ width: 300, opacity: 1 }}
+             className="hidden md:flex flex-col w-[300px] bg-white border-s overflow-y-auto"
+           >
+              <div className="p-8 flex flex-col items-center border-b text-center">
+                 <div className="w-32 h-32 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4 border shadow-sm">
+                    <User size={64} />
+                 </div>
+                 <h3 className="font-bold text-lg">غرفة الدردشة الجماعية</h3>
+                 <p className="text-xs text-muted-foreground mt-1 tracking-tight italic">بيئة التعلم الإلكترونية وتطبيقات الذكاء الاصطناعي</p>
+              </div>
+
+              <div className="p-6 space-y-6">
+                 <div className="space-y-4">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">المعلومات الأساسية</h4>
+                    <div className="space-y-3">
+                       <div className="text-sm">
+                          <p className="text-[10px] font-bold text-primary">اسم المقرر</p>
+                          <p className="font-bold text-slate-700">الوعي الصحي لاختيار مكملات الملابس</p>
+                       </div>
+                       <div className="text-sm">
+                          <p className="text-[10px] font-bold text-primary">تحت إشراف</p>
+                          <p className="font-bold text-slate-700">نخبة من أساتذة جامعة المنيا</p>
+                       </div>
+                       <div className="text-sm">
+                          <p className="text-[10px] font-bold text-primary">عدد المشاركين</p>
+                          <p className="font-bold text-slate-700">{messages.length > 0 ? Array.from(new Set(messages.map(m => m.senderId))).length : 0} طالب ومعلم</p>
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="space-y-4 pt-4 border-t text-center">
+                    <p className="text-[10px] font-medium text-slate-400 leading-relaxed italic">
+                       تم تصميم هذه البيئة كجزء من بحث أكاديمي يهدف لتوفير دعم تفاعلي وشروحات عبر الذكاء الاصطناعي.
+                    </p>
+                 </div>
+              </div>
+           </motion.aside>
         </AnimatePresence>
-
-        {/* Attach Menu */}
-        <AnimatePresence>
-          {showAttach && (
-            <AttachMenu onClose={() => setShowAttach(false)} />
-          )}
-        </AnimatePresence>
-
-        {/* Emoji Button */}
-        <motion.button
-          whileHover={{ scale: 1.15 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => { setShowEmoji(e => !e); setShowAttach(false); }}
-          className={cn(
-            "p-2 rounded-full transition-colors flex-shrink-0",
-            showEmoji ? "text-[#00a884] bg-[#00a884]/10" : "text-slate-500 hover:text-slate-700 hover:bg-black/5"
-          )}
-          title="إيموجي"
-        >
-          <Smile size={24} />
-        </motion.button>
-
-        {/* Attach Button */}
-        <motion.button
-          whileHover={{ scale: 1.15 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => { setShowAttach(a => !a); setShowEmoji(false); }}
-          className={cn(
-            "p-2 rounded-full transition-colors flex-shrink-0",
-            showAttach ? "text-[#00a884] bg-[#00a884]/10" : "text-slate-500 hover:text-slate-700 hover:bg-black/5"
-          )}
-          title="إرفاق ملف"
-        >
-          <Paperclip size={22} />
-        </motion.button>
-
-        {/* Message Input + Send */}
-        <form onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={e => setNewMessage(e.target.value)}
-            onFocus={() => { setShowEmoji(false); setShowAttach(false); }}
-            placeholder="اكتب رسالتك هنا..."
-            className="flex-1 bg-white border-none rounded-xl px-4 py-2.5 text-sm text-slate-900 outline-none focus:ring-0 shadow-sm"
-          />
-          <motion.button 
-            type="submit"
-            disabled={!newMessage.trim()}
-            whileHover={newMessage.trim() ? { scale: 1.08 } : {}}
-            whileTap={newMessage.trim() ? { scale: 0.92 } : {}}
-            className={cn(
-              "w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-md flex-shrink-0",
-              newMessage.trim() ? "bg-[#00a884] text-white hover:bg-[#008f6f]" : "bg-slate-300 text-slate-500"
-            )}
-          >
-            <Send size={20} className={cn(i18n.language === 'ar' && "rotate-180")} />
-          </motion.button>
-        </form>
       </div>
     </div>
   );

@@ -109,8 +109,8 @@ export function Chatbot() {
       role: 'model',
       parts: [{
         text: i18n.language === 'ar'
-          ? `مرحباً ${profile?.displayName || ''}! أنا مساعدك الذكي في بيئة التعلم الإلكترونية وروبوتات الدردشة لتنمية مهارات ريادة الاعمال الرقمية. كيف يمكنني مساعدتك اليوم؟`
-          : `Hello ${profile?.displayName || ''}! I am your smart assistant on the E-Learning Environment and Chatbots platform for developing digital entrepreneurship skills. How can I help you today?`
+          ? `مرحباً ${profile?.displayName || ''}! أنا مساعدك الذكي في بيئة التعلم الإلكترونية وتطبيقات الذكاء الاصطناعي. كيف يمكنني مساعدتك اليوم؟`
+          : `Hello ${profile?.displayName || ''}! I am your AI assistant for the E-Learning Environment and AI Applications. How can I help you today?`
       }],
       timestamp: new Date(),
     };

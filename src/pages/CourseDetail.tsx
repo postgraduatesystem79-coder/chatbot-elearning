@@ -44,6 +44,7 @@ import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { doc, onSnapshot, setDoc, serverTimestamp, updateDoc, increment, getDoc, collection, query, where, addDoc, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 import { storage } from '../lib/firebase';
+import { AIInteractiveActivity } from '../components/AIInteractiveActivity';
 
 export function CourseDetail() {
   const { courseId, lessonId } = useParams();
@@ -88,6 +89,44 @@ export function CourseDetail() {
       default: return FileText;
     }
   };
+  
+  // Robot Messages
+  const getRobotMessage = () => {
+    if (step === 'content' && sessionData.robotInstructions) {
+      return sessionData.robotInstructions;
+    }
+
+    switch (step) {
+      case 'objectives':
+        return isAr 
+          ? 'أهلاً بكِ! في أهداف هذا الدرس سنتعرف على كيفية اختيار مكملات الملابس التي تحمي صحتك وتجنبك الحساسية.' 
+          : 'Welcome! In this lesson\'s objectives, we will learn how to choose clothing accessories that protect your health and avoid allergies.';
+      case 'content':
+        return isAr
+          ? 'هنا ستجدين المحتوى التعليمي. أنصحكِ بالتركيز على أنواع الخامات وتأثيرها الصحي على الجسم.'
+          : 'Here you will find the educational content. I recommend focusing on the types of materials and their health impact on the body.';
+      case 'activities':
+        return isAr
+          ? 'حان وقت النشاط! دعينا نطبق ما تعلمناه عن معايير الاختيار الصحي للمكملات بأسلوب تفاعلي.'
+          : 'Activity time! Let\'s apply what we learned about health selection criteria for accessories in an interactive way.';
+      case 'evaluation':
+        return isAr
+          ? 'أنتِ جاهرة الآن لاختبار وعيك الصحي. الأسئلة تهدف للتأكد من قدرتك على الاختيار السليم.'
+          : 'You are now ready to test your health awareness. The questions aim to ensure your ability to make the right choice.';
+      case 'result':
+        return isAr
+          ? (evaluationScore || 0) >= 85 
+            ? 'رائع جداً! وعيك الصحي بمكملات الملابس ممتاز. أنتِ الآن قادرة على الاختيار بأمان!' 
+            : 'محاولة جيدة، ولكن الصحة تتطلب دقة أكبر. أنصحك بمراجعة المحتوى الصحي للمكملات مرة أخرى.'
+          : (evaluationScore || 0) >= 85
+            ? 'Wonderful! Your health awareness regarding clothing accessories is excellent. You can now choose safely!'
+            : 'Good attempt, but health requires more precision. I recommend reviewing the health content of accessories again.';
+      default:
+        return i18n.language === 'ar' ? 'أنا هنا لمساعدتكِ في رحلة الوعي الصحي!' : 'I am here to help you in your health awareness journey!';
+    }
+  };
+
+  const isAr = i18n.language === 'ar';
   
   // Timer state
   const [secondsElapsed, setSecondsElapsed] = useState(0);
@@ -154,83 +193,14 @@ export function CourseDetail() {
     title: "محتوى الدرس",
     generalObjective: '',
     videoUrl: 'https://www.youtube.com/embed/y53kwdqTLNU',
-    wordUrl: 'https://example.com/word',
-    pptUrl: 'https://example.com/ppt',
-    pdfUrl: 'https://example.com/pdf',
-    audioUrl: 'https://example.com/audio',
-    objectives: [
-      "فهم مفهوم البيئة التكيفية.",
-      "التعرف على مكونات لوحة تحكم المعلم.",
-      "القدرة على التفاعل مع المحتوى التعليمي المتنوع.",
-    ],
-    content: [
-      { id: 'video', type: 'video', title: 'فيديو تعليمي', color: 'text-purple-500', url: 'https://www.youtube.com/embed/y53kwdqTLNU' },
-      { id: 'pdf', type: 'pdf', title: 'ملف PDF', color: 'text-red-500' },
-      { id: 'ppt', type: 'ppt', title: 'عرض تقديمي (PPT)', color: 'text-orange-500' },
-      { id: 'word', type: 'word', title: 'مستند نصي (Word)', color: 'text-blue-500' },
-      { id: 'audio', type: 'audio', title: 'تسجيل صوتي', color: 'text-green-500' },
-    ],
-    activities: [
-      { id: 'act1', title: 'نشاط تفاعلي 1: تحليل البيانات', description: 'قم بتحليل بيانات الطلاب في النموذج المرفق.' },
-      { id: 'act2', title: 'نشاط تفاعلي 2: تصميم مسار', description: 'صمم مساراً تعليمياً تكيفياً بسيطاً.' },
-    ],
-    evaluation: [
-      {
-        id: 'q1',
-        question: 'أي من العبارات التالية تُعبّر بدقة عن المقصود بالذكاء الاصطناعي في المجال التعليمي؟',
-        options: [
-          { id: 'a', text: 'استخدام أجهزة الحاسوب في عرض المحتوى الدراسي' },
-          { id: 'b', text: 'قدرة الأنظمة الرقمية على اتخاذ قرارات مستقلة ومتابعة سلوك المتعلم' },
-          { id: 'c', text: 'تسجيل الحضور والدرجات باستخدام نظم إلكترونية' },
-          { id: 'd', text: 'مشاركة المعلم لموارد تعليمية عبر البريد الإلكتروني' }
-        ],
-        correctId: 'b'
-      },
-      {
-        id: 'q2',
-        question: "اختر الخيار الذي يُفسر بصورة صحيحة آلية عمل 'التعلم الآلي' (Machine Learning) في التعليم:",
-        options: [
-          { id: 'a', text: 'يعتمد على الحدس البشري في بناء المحتوى' },
-          { id: 'b', text: 'يتبع سيناريوهات تعليمية ثابتة لا تتغير' },
-          { id: 'c', text: 'يتعلم من بيانات المتعلم ليطور قرارات مخصصة تلقائيًا' },
-          { id: 'd', text: 'يستخدم الإنترنت فقط لجلب المعلومات' }
-        ],
-        correctId: 'c'
-      },
-      {
-        id: 'q3',
-        question: 'أي من المجالات التالية لا تُعد من الاستخدامات المباشرة للذكاء الاصطناعي في تحسين جودة التعليم؟',
-        options: [
-          { id: 'a', text: 'تقديم تغذية راجعة فورية للطلاب' },
-          { id: 'b', text: 'التوصية بمصادر تعليمية مناسبة' },
-          { id: 'c', text: 'تصميم الأثاث المدرسي الذكي' },
-          { id: 'd', text: 'متابعة تقدم المتعلم عبر تحليلات الأداء' }
-        ],
-        correctId: 'c'
-      },
-      {
-        id: 'q4',
-        question: 'يتعلم طالب بشكل غير متوازن بين الرياضيات واللغة. ما الطريقة الأنسب التي يمكن للذكاء الاصطناعي اتباعها لتخصيص تعلمه؟',
-        options: [
-          { id: 'a', text: 'تقديم المحتوى ذاته لجميع المواد دون تعديل' },
-          { id: 'b', text: 'تعطيل المادة التي يعاني منها مؤقتًا' },
-          { id: 'c', text: 'تحليل أداء الطالب وتقديم مهام إضافية مخصصة في الرياضيات' },
-          { id: 'd', text: 'الاكتفاء برصد النتائج النهائية دون تدخل' }
-        ],
-        correctId: 'c'
-      },
-      {
-        id: 'q5',
-        question: 'أي من الخيارات التالية يُمثّل فائدة واقعية لتوظيف الذكاء الاصطناعي في تطوير التعليم من منظور تنظيمي ذاتي؟',
-        options: [
-          { id: 'a', text: 'تقليص دور المتعلم في اتخاذ القرار' },
-          { id: 'b', text: 'تسريع إنجاز الواجبات بلا فهم حقيقي' },
-          { id: 'c', text: 'دعم المتعلم بخطط مخصصة ومراجعة آلية لتقدمه' },
-          { id: 'd', text: 'إجبار المتعلم على اتباع مسار تعلم واحد فقط' }
-        ],
-        correctId: 'c'
-      }
-    ]
+    wordUrl: '',
+    pptUrl: '',
+    pdfUrl: '',
+    audioUrl: '',
+    objectives: [],
+    content: [],
+    activities: [],
+    evaluation: [],
   });
 
   const [isLocked, setIsLocked] = useState(false);
@@ -250,20 +220,12 @@ export function CourseDetail() {
       
       const currentIndex = lessons.findIndex(l => l.id === lessonId);
       if (currentIndex > 0) {
-        const currentLesson = lessons[currentIndex];
-        const statsKey = currentLesson.lessonNumber ? `session-${currentLesson.lessonNumber}` : currentLesson.id;
-        const isCurrentCompleted = profile?.stats?.completedLessons?.includes(statsKey) || 
-                                   profile?.stats?.completedLessons?.includes(currentLesson.id);
-
         const previousLesson = lessons[currentIndex - 1];
         const prevStatsKey = previousLesson.lessonNumber ? `session-${previousLesson.lessonNumber}` : previousLesson.id;
         const isPrevCompleted = profile?.stats?.completedLessons?.includes(prevStatsKey) || 
-                                profile?.stats?.completedLessons?.includes(previousLesson.id) ||
-                                profile?.stats?.evaluationPerformance?.[prevStatsKey] !== undefined ||
-                                profile?.stats?.evaluationPerformance?.[previousLesson.id] !== undefined;
+                                profile?.stats?.evaluationPerformance?.[prevStatsKey] !== undefined;
         
-        // Locked only if current is NOT completed AND previous is NOT completed
-        if (!isCurrentCompleted && !isPrevCompleted) {
+        if (!isPrevCompleted) {
           setIsLocked(true);
           toast.error('يجب إكمال الدرس السابق أولاً');
           navigate(`/courses/${courseId}/lessons`);
@@ -276,20 +238,41 @@ export function CourseDetail() {
     return () => unsubscribe();
   }, [courseId, lessonId, isTeacher, profile?.stats?.completedLessons, profile?.stats?.evaluationPerformance]);
 
-  // Check if current lesson is completed
-  const statsKey = sessionData?.lessonNumber ? `session-${sessionData.lessonNumber}` : lessonId;
-  const isLessonCompleted = lessonId && (
-    profile?.stats?.completedLessons?.includes(statsKey) || 
-    profile?.stats?.completedLessons?.includes(lessonId) ||
-    profile?.stats?.evaluationPerformance?.[statsKey] !== undefined ||
-    profile?.stats?.evaluationPerformance?.[lessonId] !== undefined
-  );
-
-  // Fetch session data from Firestore
+  // Fetch session data with resilient API fallback
   useEffect(() => {
     const sessionId = lessonId || 'session-1';
+
+    // 1. Fetch from local API first
+    fetch(`/api/sessions/${sessionId}`)
+      .then(res => res.json())
+      .then(json => {
+        if (json.success && json.session) {
+          const data = json.session;
+          setSessionData({
+            ...data,
+            evaluation: normalizeEvaluation(data.evaluation || [])
+          });
+          setEditingSession({
+            title: data.title || '',
+            generalObjective: data.generalObjective || '',
+            webUrl: data.webUrl || '',
+            videoUrl: data.videoUrl || '',
+            wordUrl: data.wordUrl || '',
+            pptUrl: data.pptUrl || '',
+            pdfUrl: data.pdfUrl || '',
+            audioUrl: data.audioUrl || '',
+            code: data.code || '',
+            objectives: (data.objectives || []).join('\n'),
+            activities: [...(data.activities || [])],
+            evaluation: normalizeEvaluation(data.evaluation || [])
+          });
+          setIsLoading(false);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Also listen to Firestore live updates
     const docRef = doc(db, 'sessions', sessionId);
-    
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data() as any;
@@ -314,7 +297,7 @@ export function CourseDetail() {
       }
       setIsLoading(false);
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, sessionId);
+      console.warn("Firestore session get offline, using local data:", error);
       setIsLoading(false);
     });
 
@@ -354,7 +337,7 @@ export function CourseDetail() {
         code: editingSession.code,
         objectives: newObjectives,
         activities: editingSession.activities,
-        evaluation: normalizeEvaluation(editingSession.evaluation),
+        evaluation: editingSession.evaluation,
         content: [
           { id: 'web', type: 'web', title: 'صفحة ويب', icon: 'Globe', color: 'text-blue-600', url: editingSession.webUrl },
           { id: 'code', type: 'code', title: 'كود مدمج', icon: 'FileCode', color: 'text-slate-600', url: editingSession.code },
@@ -368,10 +351,23 @@ export function CourseDetail() {
       };
 
       const sessionId = lessonId || 'session-1';
-      await setDoc(doc(db, 'sessions', sessionId), updatedData);
+
+      // 1. Send to server API
+      await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: sessionId, ...updatedData })
+      });
+
+      // 2. Also try Firestore in background
+      setDoc(doc(db, 'sessions', sessionId), updatedData, { merge: true }).catch(() => {});
+
+      setSessionData(updatedData as any);
+      toast.success('تم حفظ الدرس وتحديث الأنشطة بنجاح');
       setIsEditModalOpen(false);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, lessonId || 'session-1');
+    } catch (error: any) {
+      console.error('Error saving session:', error);
+      toast.error('حدث خطأ أثناء حفظ التعديلات');
     } finally {
       setIsSaving(false);
     }
@@ -404,29 +400,19 @@ export function CourseDetail() {
       if (profile?.uid && lessonId) {
         const statsRef = doc(db, 'users', profile.uid);
         const currentCompleted = profile?.stats?.completedLessons || [];
-        const statsKey = getStatsKey();
-        const newCompletedCount = (currentCompleted.includes(statsKey) || currentCompleted.includes(lessonId))
+        const newCompletedCount = currentCompleted.includes(getStatsKey()) 
           ? currentCompleted.length 
-          : currentCompleted.length + (statsKey !== lessonId ? 2 : 1);
+          : currentCompleted.length + 1;
         
         const totalLessons = allLessons.length || 7;
-        const progressPercent = Math.round(((currentCompleted.includes(statsKey) ? currentCompleted.length : currentCompleted.length + 1) / totalLessons) * 100);
+        const progressPercent = Math.round((newCompletedCount / totalLessons) * 100);
 
-        // Save with both keys (session-X and document ID) for cross-compatibility
-        const updateData: any = {
-          [`stats.evaluationPerformance.${statsKey}`]: scorePercent,
-          [`stats.completedLessons`]: arrayUnion(statsKey),
+        await updateDoc(statsRef, {
+          [`stats.evaluationPerformance.${getStatsKey()}`]: scorePercent,
+          [`stats.completedLessons`]: arrayUnion(getStatsKey()),
           [`stats.coursesCompleted`]: increment(1),
           progress: progressPercent
-        };
-        // Also save using lessonId if it differs from statsKey
-        if (statsKey !== lessonId) {
-          updateData[`stats.evaluationPerformance.${lessonId}`] = scorePercent;
-          updateData[`stats.completedLessons`] = arrayUnion(statsKey, lessonId);
-        }
-
-        await updateDoc(statsRef, updateData)
-          .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}/stats/evaluation`));
+        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}/stats/evaluation`));
       }
     } else {
       setHasFailed(true);
@@ -434,16 +420,9 @@ export function CourseDetail() {
       // Save failed attempt with score percentage
       if (profile?.uid && lessonId) {
         const statsRef = doc(db, 'users', profile.uid);
-        const statsKey = getStatsKey();
-        const updateData: any = {
-          [`stats.evaluationPerformance.${statsKey}`]: scorePercent
-        };
-        // Also save using lessonId if it differs from statsKey
-        if (statsKey !== lessonId) {
-          updateData[`stats.evaluationPerformance.${lessonId}`] = scorePercent;
-        }
-        await updateDoc(statsRef, updateData)
-          .catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}/stats/evaluation`));
+        await updateDoc(statsRef, {
+          [`stats.evaluationPerformance.${getStatsKey()}`]: scorePercent // Save percentage even if failed
+        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}/stats/evaluation`));
       }
     }
     setStep('result');
@@ -611,7 +590,43 @@ export function CourseDetail() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-12">
+    <div className="max-w-5xl mx-auto space-y-8 pb-12 relative">
+      {/* AI Robot Learning Companion */}
+      <div className="fixed bottom-8 start-8 z-50 pointer-events-none md:pointer-events-auto">
+        <motion.div
+           initial={{ opacity: 0, scale: 0.8, x: isAr ? 50 : -50 }}
+           animate={{ opacity: 1, scale: 1, x: 0 }}
+           className="relative"
+        >
+          {/* Speech Bubble */}
+          <div className={cn(
+            "absolute bottom-full mb-4 w-48 p-4 bg-primary text-primary-foreground text-xs font-bold rounded-2xl shadow-xl border-2 border-white/20 after:content-[''] after:absolute after:top-full after:border-8 after:border-transparent after:border-t-primary",
+            isAr ? "end-4 after:end-4" : "start-4 after:start-4"
+          )}>
+            {getRobotMessage()}
+          </div>
+          
+          {/* Avatar Container */}
+          <div className="w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-2xl p-1 shadow-2xl border-4 border-white overflow-hidden flex items-center justify-center">
+             <div className="w-full h-full bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center">
+                <Cpu className="text-white animate-pulse" size={32} />
+             </div>
+             {/* Robot Face Visualization */}
+             <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex gap-2 mb-2">
+                   <div className="w-2 h-2 bg-white rounded-full animate-bounce" />
+                   <div className="w-2 h-2 bg-white rounded-full animate-bounce delay-100" />
+                </div>
+             </div>
+          </div>
+          
+          {/* Status Badge */}
+          <div className="absolute -top-2 -right-2 w-6 h-6 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
+             <div className="w-2 h-2 bg-white rounded-full animate-ping" />
+          </div>
+        </motion.div>
+      </div>
+
       {/* Session Navigation Header */}
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
@@ -748,7 +763,7 @@ export function CourseDetail() {
                   const isLocked = !isTeacher && isVideoItem && hasWeb && !isWebRead;
                   
                   let isDisabled = false;
-                  if (!isTeacher && !isAdmin && !isLessonCompleted) {
+                  if (!isTeacher && !isAdmin) {
                     if (isWebItem) {
                       isDisabled = false;
                     } else if (isVideoItem) {
@@ -953,16 +968,16 @@ export function CourseDetail() {
                   <button onClick={() => setStep('objectives')} className="flex-1 py-3 rounded-xl border border-border font-bold hover:bg-muted transition-all text-foreground">السابق</button>
                   <button 
                     onClick={() => setStep('activities')} 
-                    disabled={(!isLessonCompleted && (!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead))) && !isTeacher}
+                    disabled={(!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead)) && !isTeacher}
                     className={cn(
                       "flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/20",
-                      (!isLessonCompleted && (!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead))) && !isTeacher && "grayscale"
+                      (!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead)) && !isTeacher && "grayscale"
                     )}
                   >
                     انتقل للأنشطة
                   </button>
                 </div>
-                {!isLessonCompleted && (!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead)) && !isTeacher && (
+                {(!isVideoWatched || (sessionData.content.some(c => c.type === 'web') && !isWebRead)) && !isTeacher && (
                   <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground font-bold animate-pulse">
                     <AlertCircle size={12} strokeWidth={2} />
                     <span>يرجى قراءة المحتوى ومشاهدة الفيديو التعليمي وتأكيد ذلك لتفعيل زر التالي</span>
@@ -1063,6 +1078,17 @@ export function CourseDetail() {
                           </div>
                         )}
                       </div>
+                    </div>
+
+                    {/* Interactive AI Widget for the Activity */}
+                    <div className="pt-3">
+                      <AIInteractiveActivity 
+                        activity={act} 
+                        onApplyAnswer={(text) => {
+                          setActivityAnswers(prev => ({ ...prev, [act.id]: text }));
+                        }}
+                        isTeacher={isTeacher}
+                      />
                     </div>
 
                     {/* Submission Section */}
@@ -1264,11 +1290,7 @@ export function CourseDetail() {
                     </div>
                     
                     <p className="text-xl font-bold text-foreground tracking-tight leading-relaxed">{sessionData.evaluation[currentQuestionIndex].question}</p>
-                    
-                    <div className={cn(
-                      "grid gap-3",
-                      sessionData.evaluation[currentQuestionIndex].options.length === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
-                    )}>
+                    <div className="grid gap-3">
                       {sessionData.evaluation[currentQuestionIndex].options.map((opt: any, oIdx: number) => {
                         const isSelected = quizAnswers[currentQuestionIndex] === opt.id;
                         const isCorrectOption = opt.id === sessionData.evaluation[currentQuestionIndex].correctId;
@@ -1283,24 +1305,23 @@ export function CourseDetail() {
                               setCheckedQuestions({ ...checkedQuestions, [currentQuestionIndex]: true });
                             }}
                             className={cn(
-                              "w-full p-5 rounded-xl border text-start transition-all font-bold relative group flex items-center justify-between",
+                              "w-full p-5 rounded-xl border text-start transition-all font-bold relative group",
                               !hasChecked && isSelected && "bg-primary/5 border-primary shadow-inner",
                               hasChecked && isCorrectOption && "bg-green-500/5 border-green-500 text-green-600 shadow-inner",
                               hasChecked && isSelected && !isCorrectOption && "bg-destructive/5 border-destructive text-destructive shadow-inner",
-                              !hasChecked && "hover:bg-muted hover:border-primary/30",
-                              sessionData.evaluation[currentQuestionIndex].options.length === 2 && "justify-center text-center"
+                              !hasChecked && "hover:bg-muted hover:border-primary/30"
                             )}
                           >
-                            <span className="text-sm">{opt.text}</span>
-                            {hasChecked && isCorrectOption && <CheckCircle2 size={20} className="text-green-600 absolute end-4 top-1/2 -translate-y-1/2" strokeWidth={1.5} />}
-                            {hasChecked && isSelected && !isCorrectOption && <X size={20} className="text-destructive absolute end-4 top-1/2 -translate-y-1/2" strokeWidth={1.5} />}
-                            {!hasChecked && isSelected && <div className="w-2 h-2 rounded-full bg-primary absolute end-4 top-1/2 -translate-y-1/2 shadow-lg shadow-primary/20" />}
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm">{opt.text}</span>
+                              {hasChecked && isCorrectOption && <CheckCircle2 size={20} className="text-green-600" strokeWidth={1.5} />}
+                              {hasChecked && isSelected && !isCorrectOption && <X size={20} className="text-destructive" strokeWidth={1.5} />}
+                              {!hasChecked && isSelected && <div className="w-4 h-4 rounded-full bg-primary shadow-lg shadow-primary/20" />}
+                            </div>
                           </button>
                         );
                       })}
                     </div>
-
-
 
                     {checkedQuestions[currentQuestionIndex] && (
                       <motion.div 
@@ -1347,7 +1368,7 @@ export function CourseDetail() {
                   currentQuestionIndex < sessionData.evaluation.length - 1 ? (
                     <button 
                       onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
-                      disabled={!checkedQuestions[currentQuestionIndex]}
+                      disabled={!quizAnswers[currentQuestionIndex]}
                       className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all disabled:opacity-50"
                     >
                       السؤال التالي
@@ -1355,7 +1376,7 @@ export function CourseDetail() {
                   ) : (
                     <button 
                       onClick={handleEvaluation}
-                      disabled={!checkedQuestions[currentQuestionIndex]}
+                      disabled={!quizAnswers[currentQuestionIndex]}
                       className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all disabled:opacity-50"
                     >
                       إرسال الإجابة
@@ -1745,49 +1766,26 @@ export function CourseDetail() {
                   <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
                     <div className="flex items-center justify-between">
                       <h4 className="font-bold text-sm text-muted-foreground uppercase">الأسئلة والتقييم</h4>
-                      <div className="flex items-center gap-3">
-                        <button 
-                          type="button"
-                          onClick={() => setEditingSession({
-                            ...editingSession,
-                            evaluation: [...editingSession.evaluation, {
-                              id: Date.now(),
-                              question: '',
-                              options: [
-                                { id: 'a', text: '' },
-                                { id: 'b', text: '' },
-                                { id: 'c', text: '' },
-                                { id: 'd', text: '' },
-                              ],
-                              correctId: 'a'
-                            }]
-                          })}
-                          className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
-                        >
-                          <Plus size={14} />
-                          سؤال اختيارات
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => setEditingSession({
-                            ...editingSession,
-                            evaluation: [...editingSession.evaluation, {
-                              id: Date.now(),
-                              question: '',
-                              options: [
-                                { id: 'a', text: 'صواب' },
-                                { id: 'b', text: 'خطأ' },
-                              ],
-                              correctId: 'a',
-                              type: 'true_false'
-                            }]
-                          })}
-                          className="text-xs font-bold text-secondary flex items-center gap-1 hover:underline"
-                        >
-                          <Plus size={14} />
-                          سؤال صواب/خطأ
-                        </button>
-                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setEditingSession({
+                          ...editingSession,
+                          evaluation: [...editingSession.evaluation, {
+                            id: Date.now(),
+                            question: '',
+                            options: [
+                              { id: 'a', text: '' },
+                              { id: 'b', text: '' },
+                              { id: 'c', text: '' },
+                            ],
+                            correctId: 'b'
+                          }]
+                        })}
+                        className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
+                      >
+                        <Plus size={14} />
+                        إضافة سؤال جديد
+                      </button>
                     </div>
                     
                     <div className="space-y-8">
